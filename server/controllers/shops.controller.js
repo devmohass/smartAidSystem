@@ -1,11 +1,6 @@
 import pool from "../db.js";
 
-function parseId(value) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-export async function listShops(req, res) {
+export async function listShops(_req, res) {
   try {
     const {rows} = await pool.query(
       "SELECT id, name, location, owner_name, created_by, created_at FROM shops ORDER BY id ASC"
@@ -18,8 +13,7 @@ export async function listShops(req, res) {
 }
 
 export async function getShop(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid shop id"});
+  const {id} = req.params;
 
   try {
     const {rows} = await pool.query(
@@ -35,18 +29,14 @@ export async function getShop(req, res) {
 }
 
 export async function createShop(req, res) {
-  const {name, location, owner_name} = req.body || {};
-
-  if (!name || typeof name !== "string" || name.trim() === "") {
-    return res.status(400).json({error: "name is required"});
-  }
+  const {name, location, owner_name} = req.body;
 
   try {
     const {rows} = await pool.query(
       `INSERT INTO shops (name, location, owner_name, created_by)
        VALUES ($1, $2, $3, $4)
        RETURNING id, name, location, owner_name, created_by, created_at`,
-      [name.trim(), location ?? null, owner_name ?? null, req.user.id]
+      [name, location ?? null, owner_name ?? null, req.user.id]
     );
     return res.status(201).json({shop: rows[0]});
   } catch (err) {
@@ -56,24 +46,15 @@ export async function createShop(req, res) {
 }
 
 export async function updateShop(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid shop id"});
-
-  const {name, location, owner_name} = req.body || {};
-
-  if (name === undefined && location === undefined && owner_name === undefined) {
-    return res.status(400).json({error: "Provide at least one field to update (name, location, owner_name)"});
-  }
-  if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
-    return res.status(400).json({error: "name must be a non-empty string"});
-  }
+  const {id} = req.params;
+  const {name, location, owner_name} = req.body;
 
   const fields = [];
   const values = [];
   let i = 1;
   if (name !== undefined) {
     fields.push(`name = $${i++}`);
-    values.push(name.trim());
+    values.push(name);
   }
   if (location !== undefined) {
     fields.push(`location = $${i++}`);
@@ -100,8 +81,7 @@ export async function updateShop(req, res) {
 }
 
 export async function listShopManagers(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid shop id"});
+  const {id} = req.params;
 
   try {
     const shopExists = await pool.query("SELECT 1 FROM shops WHERE id = $1", [id]);
@@ -125,12 +105,8 @@ export async function listShopManagers(req, res) {
 }
 
 export async function assignShopManager(req, res) {
-  const shopId = parseId(req.params.id);
-  if (!shopId) return res.status(400).json({error: "Invalid shop id"});
-
-  const {user_id} = req.body || {};
-  const userId = parseId(user_id);
-  if (!userId) return res.status(400).json({error: "user_id is required and must be a positive integer"});
+  const {id: shopId} = req.params;
+  const {user_id: userId} = req.body;
 
   const client = await pool.connect();
   try {
@@ -169,8 +145,7 @@ export async function assignShopManager(req, res) {
 }
 
 export async function getShopReport(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid shop id"});
+  const {id} = req.params;
 
   try {
     const {rows: shopRows} = await pool.query(
@@ -227,9 +202,7 @@ export async function getShopReport(req, res) {
 }
 
 export async function unassignShopManager(req, res) {
-  const shopId = parseId(req.params.id);
-  const userId = parseId(req.params.userId);
-  if (!shopId || !userId) return res.status(400).json({error: "Invalid id"});
+  const {id: shopId, userId} = req.params;
 
   try {
     const result = await pool.query(
