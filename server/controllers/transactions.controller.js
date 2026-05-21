@@ -1,15 +1,5 @@
 import pool from "../db.js";
 
-function parseId(value) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function parseAmount(value) {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 function formatDateYYYYMMDD(date) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -18,16 +8,13 @@ function formatDateYYYYMMDD(date) {
 }
 
 export async function processTransaction(req, res) {
-  const {campaign_id, beneficiary_id, shop_id, amount, goods_description} = req.body || {};
-
-  const campaignId = parseId(campaign_id);
-  if (!campaignId) return res.status(400).json({error: "campaign_id is required and must be a positive integer"});
-  const benId = parseId(beneficiary_id);
-  if (!benId) return res.status(400).json({error: "beneficiary_id is required and must be a positive integer"});
-  const shopId = parseId(shop_id);
-  if (!shopId) return res.status(400).json({error: "shop_id is required and must be a positive integer"});
-  const txnAmount = parseAmount(amount);
-  if (txnAmount === null) return res.status(400).json({error: "amount is required and must be a positive number"});
+  const {
+    campaign_id: campaignId,
+    beneficiary_id: benId,
+    shop_id: shopId,
+    amount: txnAmount,
+    goods_description,
+  } = req.body;
 
   const client = await pool.connect();
   try {
@@ -129,7 +116,7 @@ export async function processTransaction(req, res) {
   }
 }
 
-export async function listTransactions(req, res) {
+export async function listTransactions(_req, res) {
   try {
     const {rows} = await pool.query(
       `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
@@ -148,8 +135,7 @@ export async function listTransactions(req, res) {
 }
 
 export async function getTransaction(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid transaction id"});
+  const {id} = req.params;
 
   try {
     const {rows} = await pool.query(
