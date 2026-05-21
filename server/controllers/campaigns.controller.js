@@ -34,12 +34,18 @@ export async function getCampaign(req, res) {
 export async function createCampaign(req, res) {
   const {title, location, start_date, end_date, budget} = req.body;
 
+  // Joi gave us Date objects; pg + DATE column would coerce through the
+  // session timezone (off-by-one risk on non-UTC DBs). Pass YYYY-MM-DD
+  // strings so the date lands exactly as the user provided it.
+  const startStr = start_date.toISOString().slice(0, 10);
+  const endStr = end_date.toISOString().slice(0, 10);
+
   try {
     const {rows} = await pool.query(
       `INSERT INTO campaigns (title, location, start_date, end_date, budget, created_by)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING ${SELECT_FIELDS}`,
-      [title, location ?? null, start_date, end_date, budget, req.user.id]
+      [title, location ?? null, startStr, endStr, budget, req.user.id]
     );
     return res.status(201).json({campaign: rows[0]});
   } catch (err) {
