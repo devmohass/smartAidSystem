@@ -1,0 +1,167 @@
+### SmartAid REST tests — Shops CRUD + shop_managers assignment (admin only)
+
+@host = http://localhost:3000
+
+### Login as admin
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "admin123"
+}
+
+### Login as shop_manager (to verify 403)
+# @name loginManager
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@smartaid.com",
+  "password": "manager123"
+}
+
+### 1) GET /api/shops without token
+# Expected: 401
+GET {{host}}/api/shops
+
+### 2) GET /api/shops as shop_manager
+# Expected: 403
+GET {{host}}/api/shops
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 3) GET /api/shops as admin
+# Expected: 200, list of shops
+GET {{host}}/api/shops
+Authorization: Bearer {{login.response.body.token}}
+
+### 4) GET /api/shops/1
+# Expected: 200, single shop
+GET {{host}}/api/shops/1
+Authorization: Bearer {{login.response.body.token}}
+
+### 5) GET /api/shops/9999
+# Expected: 404
+GET {{host}}/api/shops/9999
+Authorization: Bearer {{login.response.body.token}}
+
+### 6) POST create new shop
+# Expected: 201, created_by = current admin
+# @name createShop
+POST {{host}}/api/shops
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "REST Test Shop",
+  "location": "Mogadishu - Karan",
+  "owner_name": "REST Owner"
+}
+
+### 7) POST missing name
+# Expected: 400
+POST {{host}}/api/shops
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "location": "Somewhere"
+}
+
+### 8) PUT partial update (owner_name only)
+# Expected: 200
+PUT {{host}}/api/shops/{{createShop.response.body.shop.id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "owner_name": "Updated REST Owner"
+}
+
+### 9) PUT no fields
+# Expected: 400
+PUT {{host}}/api/shops/{{createShop.response.body.shop.id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{}
+
+### 10) GET managers of shop 1
+# Expected: 200, list of managers
+GET {{host}}/api/shops/1/managers
+Authorization: Bearer {{login.response.body.token}}
+
+### 11) Create a fresh shop_manager user (to assign in test 12)
+# Expected: 201
+# @name createMgr
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "REST Manager",
+  "email": "rest-mgr@smartaid.com",
+  "password": "mgr12345",
+  "role": "shop_manager"
+}
+
+### 12) Assign the new manager to the new shop
+# Expected: 201, returns { assignment }
+POST {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "user_id": {{createMgr.response.body.user.id}}
+}
+
+### 13) Assign the SAME manager to a different shop (id=1) — already assigned
+# Expected: 409 with assigned_shop_id
+POST {{host}}/api/shops/1/managers
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "user_id": {{createMgr.response.body.user.id}}
+}
+
+### 14) Assign admin user (wrong role) as a shop_manager
+# Expected: 400
+POST {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "user_id": 1
+}
+
+### 15) Assign non-existent user
+# Expected: 404
+POST {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "user_id": 9999
+}
+
+### 16) List managers of the new shop
+# Expected: 200, shows the manager we just assigned
+GET {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers
+Authorization: Bearer {{login.response.body.token}}
+
+### 17) Unassign the new manager
+# Expected: 204
+DELETE {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers/{{createMgr.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### 18) Unassign again (already gone)
+# Expected: 404
+DELETE {{host}}/api/shops/{{createShop.response.body.shop.id}}/managers/{{createMgr.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### 19) Clean up: delete the rest-mgr user we created
+# Expected: 204
+DELETE {{host}}/api/users/{{createMgr.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}

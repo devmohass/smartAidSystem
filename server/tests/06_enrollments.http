@@ -1,0 +1,201 @@
+### SmartAid REST tests — Campaign Enrollment (admin only)
+### This file creates its own fresh campaign so it doesn't depend on other
+### test files. It enrolls beneficiaries, tests the budget cap, then closes
+### the campaign and verifies frozen-state errors.
+
+@host = http://localhost:3000
+
+### Login as admin
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "admin123"
+}
+
+### Create a fresh draft campaign with budget 600
+# @name createCampaign
+POST {{host}}/api/campaigns
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "title": "Enrollment REST Test",
+  "location": "Mogadishu",
+  "start_date": "2026-09-01",
+  "end_date": "2026-09-30",
+  "budget": 600
+}
+
+### 1) GET enrollments for campaign with none yet
+# Expected: 200, { enrollments: [] }
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+
+### 2) GET enrollments for non-existent campaign
+# Expected: 404
+GET {{host}}/api/campaigns/9999/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+
+### 3) Enroll beneficiary id=1 with 300
+# Expected: 201, remaining_balance == allocated_balance == 300
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 1,
+  "allocated_balance": 300
+}
+
+### 4) Try to enroll beneficiary id=1 AGAIN
+# Expected: 409 "already enrolled"
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 1,
+  "allocated_balance": 50
+}
+
+### 5) Enroll beneficiary id=2 with 400 — would exceed budget (300+400=700 > 600)
+# Expected: 409 with details.available = 300
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 2,
+  "allocated_balance": 400
+}
+
+### 6) Enroll beneficiary id=2 with exact remaining 300 (300+300=600)
+# Expected: 201
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 2,
+  "allocated_balance": 300
+}
+
+### 7) Enroll non-existent beneficiary
+# Expected: 404
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 9999,
+  "allocated_balance": 50
+}
+
+### 8) Bad allocation amount
+# Expected: 400
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 1,
+  "allocated_balance": 0
+}
+
+### 9) Missing fields
+# Expected: 400
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{}
+
+### 10) GET enrollments now (should show 2 with beneficiary names)
+# Expected: 200, enrollments array with 2 items
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+
+### 11) PUT update beneficiary id=1 allocation from 300 -> 250
+# Expected: 200, allocated=250, remaining=250 (spent was 0, delta -50)
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries/1
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "allocated_balance": 250
+}
+
+### 12) PUT update beneficiary id=1 from 250 -> 400 — total would be 700 > 600
+# Expected: 409 with details
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries/1
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "allocated_balance": 400
+}
+
+### 13) PUT non-existent enrollment
+# Expected: 404
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries/9999
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "allocated_balance": 100
+}
+
+### 14) PUT bad allocated value
+# Expected: 400
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries/1
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "allocated_balance": -5
+}
+
+### 15) Close the campaign (refund: 250+300 = 550 back to ngo_account)
+# Expected: 200, refunded = 550
+# Check pgAdmin afterwards: this campaign's enrollment rows have remaining_balance = 0
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### 16) Now close it
+# Expected: 200, refunded = 550 since none was spent
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "status": "closed"
+}
+
+### 17) Try to enroll into a closed campaign
+# Expected: 409
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 1,
+  "allocated_balance": 50
+}
+
+### 18) Try to update an allocation on a closed campaign
+# Expected: 409
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries/1
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "allocated_balance": 100
+}

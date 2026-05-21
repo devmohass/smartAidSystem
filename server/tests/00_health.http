@@ -1,0 +1,17 @@
+### SmartAid REST tests — health & root (no auth required)
+### Tool: VS Code "REST Client" extension by Huachao Mao
+### Click "Send Request" above each block, or use Ctrl/Cmd+Alt+R
+
+@host = http://localhost:3000
+
+### 1) Root welcome
+# Expected: 200 OK, { "message": "Welcome to smartAid API" }
+GET {{host}}/
+
+### 2) Health check
+# Expected: 200 OK, { "message": "Server is running" }
+GET {{host}}/health
+
+### 3) Unknown route
+# Expected: 404 Not Found (default Express HTML)
+GET {{host}}/this-does-not-exist

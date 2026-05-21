@@ -1,0 +1,173 @@
+### SmartAid REST tests — Users CRUD (admin only)
+
+@host = http://localhost:3000
+
+### Login as admin
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "admin123"
+}
+
+### Login as shop_manager (to verify they get 403)
+# @name loginManager
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@smartaid.com",
+  "password": "manager123"
+}
+
+### 1) GET /api/users without token
+# Expected: 401
+GET {{host}}/api/users
+
+### 2) GET /api/users as shop_manager
+# Expected: 403 { "error": "Forbidden: insufficient role" }
+GET {{host}}/api/users
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 3) GET /api/users as admin (list all)
+# Expected: 200 OK, { users: [...] }
+GET {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+
+### 4) GET /api/users/1 (admin detail)
+# Expected: 200 OK, { user: { id: 1, ... } }
+GET {{host}}/api/users/1
+Authorization: Bearer {{login.response.body.token}}
+
+### 5) GET /api/users/9999 (non-existent)
+# Expected: 404 { "error": "User not found" }
+GET {{host}}/api/users/9999
+Authorization: Bearer {{login.response.body.token}}
+
+### 6) POST create donor user
+# Expected: 201, returns { user } (no password_hash)
+# @name createDonor
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "REST Donor",
+  "email": "rest-donor@smartaid.com",
+  "password": "donor123",
+  "role": "donor"
+}
+
+### 7) POST create admin user (should also auto-create an ngo_account)
+# Expected: 201
+# @name createAdmin
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "REST Admin",
+  "email": "rest-admin@smartaid.com",
+  "password": "adminPass1",
+  "role": "admin"
+}
+
+### 8) POST duplicate email
+# Expected: 409 { "error": "Email already in use" }
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Dup",
+  "email": "admin@smartaid.com",
+  "password": "whatever",
+  "role": "donor"
+}
+
+### 9) POST invalid role
+# Expected: 400
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Bad Role",
+  "email": "badrole@smartaid.com",
+  "password": "secret123",
+  "role": "hacker"
+}
+
+### 10) POST short password
+# Expected: 400
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Short Pass",
+  "email": "shortpass@smartaid.com",
+  "password": "abc",
+  "role": "donor"
+}
+
+### 11) POST missing fields
+# Expected: 400
+POST {{host}}/api/users
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Anon"
+}
+
+### 12) PUT update donor's name
+# Uses the donor id captured from request #6
+# Expected: 200
+PUT {{host}}/api/users/{{createDonor.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "REST Donor Renamed"
+}
+
+### 13) PUT update with no fields
+# Expected: 400
+PUT {{host}}/api/users/{{createDonor.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{}
+
+### 14) PUT non-existent user
+# Expected: 404
+PUT {{host}}/api/users/9999
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Ghost"
+}
+
+### 15) DELETE self (admin trying to delete admin@smartaid.com — id 1)
+# Expected: 400 { "error": "You cannot delete your own account" }
+DELETE {{host}}/api/users/1
+Authorization: Bearer {{login.response.body.token}}
+
+### 16) DELETE the donor we just created (no dependents)
+# Expected: 204 No Content (empty response body)
+DELETE {{host}}/api/users/{{createDonor.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### 17) DELETE the rest-admin we created (CASCADE wipes its ngo_account)
+# Expected: 204
+DELETE {{host}}/api/users/{{createAdmin.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### 18) DELETE already-deleted user
+# Expected: 404
+DELETE {{host}}/api/users/{{createDonor.response.body.user.id}}
+Authorization: Bearer {{login.response.body.token}}

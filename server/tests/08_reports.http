@@ -1,0 +1,313 @@
+### SmartAid REST tests — Reporting (Phase 6)
+###
+### Covers 5 endpoints:
+###   GET /api/campaigns/:id/summary
+###   GET /api/shops/:id/report
+###   GET /api/dashboard
+###   GET /api/reports/transactions   (with filters + pagination)
+###   GET /api/reports/campaigns
+###
+### This file creates its own active campaign and a couple of transactions
+### so the report numbers are meaningful regardless of prior test runs.
+### Run top-to-bottom.
+
+@host = http://localhost:3000
+
+### Login as admin
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "admin123"
+}
+
+### Login as shop_manager
+# @name loginManager
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@smartaid.com",
+  "password": "manager123"
+}
+
+### Login as donor
+# @name loginDonor
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "donor1@smartaid.com",
+  "password": "donor123"
+}
+
+#######################################################################
+### SETUP — create campaign, enroll, activate, generate transactions
+#######################################################################
+
+### SETUP 1 — Create campaign (budget 700)
+# @name createCampaign
+POST {{host}}/api/campaigns
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "title": "Reports REST Test",
+  "location": "Mogadishu",
+  "start_date": "2026-12-01",
+  "end_date": "2026-12-31",
+  "budget": 700
+}
+
+### SETUP 2 — Enroll beneficiary 1 (400)
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 1,
+  "allocated_balance": 400
+}
+
+### SETUP 3 — Enroll beneficiary 2 (200)
+POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "beneficiary_id": 2,
+  "allocated_balance": 200
+}
+
+### SETUP 4 — Activate the campaign (now status='active')
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### SETUP 5 — Process txn: ben 1 spends 150
+# @name setupTxn1
+POST {{host}}/api/transactions
+Authorization: Bearer {{loginManager.response.body.token}}
+Content-Type: application/json
+
+{
+  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "beneficiary_id": 1,
+  "shop_id": 1,
+  "amount": 150,
+  "goods_description": "rice, oil"
+}
+
+### SETUP 6 — Process txn: ben 2 spends 80
+# @name setupTxn2
+POST {{host}}/api/transactions
+Authorization: Bearer {{loginManager.response.body.token}}
+Content-Type: application/json
+
+{
+  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "beneficiary_id": 2,
+  "shop_id": 1,
+  "amount": 80,
+  "goods_description": "flour"
+}
+
+#######################################################################
+### CAMPAIGN SUMMARY — GET /api/campaigns/:id/summary
+#######################################################################
+
+### 1) Campaign summary as admin
+# Expected: 200
+# total_allocated: 600 (400+200)
+# total_spent: 230 (150+80)
+# total_remaining_in_wallets: 370 (400-150 + 200-80)
+# unallocated_budget: 100 (700-600)
+# transaction_count: 2
+# beneficiary_count: 2
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/summary
+Authorization: Bearer {{login.response.body.token}}
+
+### 2) Campaign summary as donor (donor can read reports)
+# Expected: 200
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/summary
+Authorization: Bearer {{loginDonor.response.body.token}}
+
+### 3) Campaign summary as shop_manager
+# Expected: 403
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/summary
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 4) Campaign summary — non-existent
+# Expected: 404
+GET {{host}}/api/campaigns/9999/summary
+Authorization: Bearer {{login.response.body.token}}
+
+### 5) Campaign summary — no token
+# Expected: 401
+GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/summary
+
+#######################################################################
+### SHOP REPORT — GET /api/shops/:id/report
+#######################################################################
+
+### 6) Shop 1 report as admin (the manager's shop — has our setup txns)
+# Expected: 200, totals.transaction_count >= 2, by_campaign includes our campaign,
+# recent_transactions includes our two transactions
+GET {{host}}/api/shops/1/report
+Authorization: Bearer {{login.response.body.token}}
+
+### 7) Shop 2 report as admin (no transactions there)
+# Expected: 200, totals.transaction_count = 0, by_campaign = [], recent = []
+GET {{host}}/api/shops/2/report
+Authorization: Bearer {{login.response.body.token}}
+
+### 8) Shop report as donor
+# Expected: 403 (shop endpoints are admin-only per brief §8)
+GET {{host}}/api/shops/1/report
+Authorization: Bearer {{loginDonor.response.body.token}}
+
+### 9) Shop report as shop_manager
+# Expected: 403
+GET {{host}}/api/shops/1/report
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 10) Shop report — non-existent
+# Expected: 404
+GET {{host}}/api/shops/9999/report
+Authorization: Bearer {{login.response.body.token}}
+
+#######################################################################
+### DASHBOARD — GET /api/dashboard
+#######################################################################
+
+### 11) Dashboard as admin
+# Expected: 200, returns { totals, campaigns, ngo_accounts } aggregates
+GET {{host}}/api/dashboard
+Authorization: Bearer {{login.response.body.token}}
+
+### 12) Dashboard as donor (read-only is fine)
+# Expected: 200
+GET {{host}}/api/dashboard
+Authorization: Bearer {{loginDonor.response.body.token}}
+
+### 13) Dashboard as shop_manager
+# Expected: 403
+GET {{host}}/api/dashboard
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 14) Dashboard with no token
+# Expected: 401
+GET {{host}}/api/dashboard
+
+#######################################################################
+### REPORTS — filterable transactions list
+#######################################################################
+
+### 15) All transactions (no filter)
+# Expected: 200, { filters, pagination: { limit: 50, offset: 0, total }, transactions: [...] }
+GET {{host}}/api/reports/transactions
+Authorization: Bearer {{login.response.body.token}}
+
+### 16) Filter by campaign_id (our campaign)
+# Expected: total == 2 (only our setup transactions)
+GET {{host}}/api/reports/transactions?campaign_id={{createCampaign.response.body.campaign.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### 17) Filter by shop_id=1
+# Expected: 200, all returned have shop_id=1
+GET {{host}}/api/reports/transactions?shop_id=1
+Authorization: Bearer {{login.response.body.token}}
+
+### 18) Filter by beneficiary_id=2
+# Expected: 200, all returned have beneficiary_id=2
+GET {{host}}/api/reports/transactions?beneficiary_id=2
+Authorization: Bearer {{login.response.body.token}}
+
+### 19) Filter by shop_manager_id=2 (the seeded manager)
+# Expected: 200
+GET {{host}}/api/reports/transactions?shop_manager_id=2
+Authorization: Bearer {{login.response.body.token}}
+
+### 20) Pagination — limit=1
+# Expected: 200, transactions.length == 1, pagination.total = full count
+GET {{host}}/api/reports/transactions?limit=1
+Authorization: Bearer {{login.response.body.token}}
+
+### 21) Pagination — limit=2 offset=1
+# Expected: 200, returns the 2nd & 3rd rows (latest-first)
+GET {{host}}/api/reports/transactions?limit=2&offset=1
+Authorization: Bearer {{login.response.body.token}}
+
+### 22) Date range — today only
+# Expected: includes all our test transactions (run them today)
+# NOTE: adjust the date if you run this on a different day
+GET {{host}}/api/reports/transactions?from=2026-05-20T00:00:00Z&to=2026-05-20T23:59:59Z
+Authorization: Bearer {{login.response.body.token}}
+
+### 23) Date range — yesterday (should be empty if you only ran tests today)
+GET {{host}}/api/reports/transactions?from=2026-05-19T00:00:00Z&to=2026-05-19T23:59:59Z
+Authorization: Bearer {{login.response.body.token}}
+
+### 24) Bad campaign_id (not an int)
+# Expected: 400
+GET {{host}}/api/reports/transactions?campaign_id=abc
+Authorization: Bearer {{login.response.body.token}}
+
+### 25) Bad date format
+# Expected: 400
+GET {{host}}/api/reports/transactions?from=not-a-date
+Authorization: Bearer {{login.response.body.token}}
+
+### 26) Negative limit
+# Expected: 400
+GET {{host}}/api/reports/transactions?limit=-1
+Authorization: Bearer {{login.response.body.token}}
+
+### 27) Negative offset
+# Expected: 400
+GET {{host}}/api/reports/transactions?offset=-5
+Authorization: Bearer {{login.response.body.token}}
+
+### 28) Reports transactions as donor
+# Expected: 200 (donor can read all reports)
+GET {{host}}/api/reports/transactions?limit=5
+Authorization: Bearer {{loginDonor.response.body.token}}
+
+### 29) Reports transactions as shop_manager
+# Expected: 403
+GET {{host}}/api/reports/transactions
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 30) Reports transactions with no token
+# Expected: 401
+GET {{host}}/api/reports/transactions
+
+#######################################################################
+### REPORTS — campaign performance overview
+#######################################################################
+
+### 31) Campaign performance overview as admin
+# Expected: 200, array with one entry per campaign showing
+#           allocated, spent, transaction_count, beneficiary_count
+GET {{host}}/api/reports/campaigns
+Authorization: Bearer {{login.response.body.token}}
+
+### 32) Campaign performance as donor
+# Expected: 200
+GET {{host}}/api/reports/campaigns
+Authorization: Bearer {{loginDonor.response.body.token}}
+
+### 33) Campaign performance as shop_manager
+# Expected: 403
+GET {{host}}/api/reports/campaigns
+Authorization: Bearer {{loginManager.response.body.token}}
+
+### 34) Campaign performance with no token
+# Expected: 401
+GET {{host}}/api/reports/campaigns

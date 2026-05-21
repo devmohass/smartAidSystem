@@ -1,0 +1,73 @@
+### SmartAid REST tests — Authentication
+### Run requests top-to-bottom. The token captured in the "login" request is
+### reused via {{login.response.body.token}} in later requests.
+
+@host = http://localhost:3000
+
+### 1) Login as admin (valid credentials)
+# Expected: 200 OK, returns { token, user }
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "admin123"
+}
+
+### 2) Login with wrong password
+# Expected: 401 { "error": "Invalid credentials" }
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@smartaid.com",
+  "password": "WRONG_PASSWORD"
+}
+
+### 3) Login with unknown email (same error message — no user enumeration)
+# Expected: 401 { "error": "Invalid credentials" }
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@smartaid.com",
+  "password": "whatever"
+}
+
+### 4) Login with missing fields
+# Expected: 400 { "error": "email and password are required" }
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{}
+
+### 5) Login as shop_manager (for use in later tests)
+# Expected: 200 OK, returns { token, user.role = "shop_manager" }
+# @name loginManager
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@smartaid.com",
+  "password": "manager123"
+}
+
+### 6) GET /me with no token
+# Expected: 401 { "error": "Missing or invalid Authorization header" }
+GET {{host}}/api/auth/me
+
+### 7) GET /me with garbage token
+# Expected: 401 { "error": "Invalid or expired token" }
+GET {{host}}/api/auth/me
+Authorization: Bearer not-a-real-token
+
+### 8) GET /me with valid admin token
+# Expected: 200 OK, returns { user: { id, name, email, role, created_at } }
+GET {{host}}/api/auth/me
+Authorization: Bearer {{login.response.body.token}}
+
+### 9) GET /me with valid shop_manager token
+# Expected: 200 OK, user.role = "shop_manager"
+GET {{host}}/api/auth/me
+Authorization: Bearer {{loginManager.response.body.token}}
