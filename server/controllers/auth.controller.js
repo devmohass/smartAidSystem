@@ -5,11 +5,7 @@ import pool from "../db.js";
 const JWT_EXPIRES_IN = "24h";
 
 export async function login(req, res) {
-  const {email, password} = req.body || {};
-
-  if (!email || !password) {
-    return res.status(400).json({error: "email and password are required"});
-  }
+  const {email, password} = req.body;
 
   const {rows} = await pool.query(
     "SELECT id, name, email, role, password_hash FROM users WHERE email = $1",
