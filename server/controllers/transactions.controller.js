@@ -109,49 +109,37 @@ export async function processTransaction(req, res) {
     });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("processTransaction error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   } finally {
     client.release();
   }
 }
 
 export async function listTransactions(_req, res) {
-  try {
-    const {rows} = await pool.query(
-      `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
-              t.amount, t.goods_description, t.balance_before, t.balance_after,
-              t.status, t.transaction_at,
-              r.receipt_code, r.issued_at AS receipt_issued_at
-       FROM transactions t
-       LEFT JOIN receipts r ON r.transaction_id = t.id
-       ORDER BY t.id DESC`
-    );
-    return res.status(200).json({transactions: rows});
-  } catch (err) {
-    console.error("listTransactions error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
+            t.amount, t.goods_description, t.balance_before, t.balance_after,
+            t.status, t.transaction_at,
+            r.receipt_code, r.issued_at AS receipt_issued_at
+     FROM transactions t
+     LEFT JOIN receipts r ON r.transaction_id = t.id
+     ORDER BY t.id DESC`
+  );
+  return res.status(200).json({transactions: rows});
 }
 
 export async function getTransaction(req, res) {
   const {id} = req.params;
-
-  try {
-    const {rows} = await pool.query(
-      `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
-              t.amount, t.goods_description, t.balance_before, t.balance_after,
-              t.status, t.transaction_at,
-              r.receipt_code, r.issued_at AS receipt_issued_at
-       FROM transactions t
-       LEFT JOIN receipts r ON r.transaction_id = t.id
-       WHERE t.id = $1`,
-      [id]
-    );
-    if (!rows[0]) return res.status(404).json({error: "Transaction not found"});
-    return res.status(200).json({transaction: rows[0]});
-  } catch (err) {
-    console.error("getTransaction error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
+            t.amount, t.goods_description, t.balance_before, t.balance_after,
+            t.status, t.transaction_at,
+            r.receipt_code, r.issued_at AS receipt_issued_at
+     FROM transactions t
+     LEFT JOIN receipts r ON r.transaction_id = t.id
+     WHERE t.id = $1`,
+    [id]
+  );
+  if (!rows[0]) return res.status(404).json({error: "Transaction not found"});
+  return res.status(200).json({transaction: rows[0]});
 }

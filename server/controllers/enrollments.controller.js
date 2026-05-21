@@ -71,8 +71,7 @@ export async function enrollBeneficiary(req, res) {
     if (err.code === "23505") {
       return res.status(409).json({error: "Beneficiary is already enrolled in this campaign"});
     }
-    console.error("enrollBeneficiary error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   } finally {
     client.release();
   }
@@ -81,27 +80,22 @@ export async function enrollBeneficiary(req, res) {
 export async function listEnrollments(req, res) {
   const {id: campaignId} = req.params;
 
-  try {
-    const campaignCheck = await pool.query("SELECT 1 FROM campaigns WHERE id = $1", [campaignId]);
-    if (campaignCheck.rowCount === 0) {
-      return res.status(404).json({error: "Campaign not found"});
-    }
-
-    const {rows} = await pool.query(
-      `SELECT cb.id, cb.campaign_id, cb.beneficiary_id,
-              cb.allocated_balance, cb.remaining_balance, cb.enrolled_at,
-              b.name AS beneficiary_name, b.phone_number, b.qr_code
-       FROM campaign_beneficiaries cb
-       JOIN beneficiaries b ON b.id = cb.beneficiary_id
-       WHERE cb.campaign_id = $1
-       ORDER BY cb.id ASC`,
-      [campaignId]
-    );
-    return res.status(200).json({enrollments: rows});
-  } catch (err) {
-    console.error("listEnrollments error:", err);
-    return res.status(500).json({error: "Internal server error"});
+  const campaignCheck = await pool.query("SELECT 1 FROM campaigns WHERE id = $1", [campaignId]);
+  if (campaignCheck.rowCount === 0) {
+    return res.status(404).json({error: "Campaign not found"});
   }
+
+  const {rows} = await pool.query(
+    `SELECT cb.id, cb.campaign_id, cb.beneficiary_id,
+            cb.allocated_balance, cb.remaining_balance, cb.enrolled_at,
+            b.name AS beneficiary_name, b.phone_number, b.qr_code
+     FROM campaign_beneficiaries cb
+     JOIN beneficiaries b ON b.id = cb.beneficiary_id
+     WHERE cb.campaign_id = $1
+     ORDER BY cb.id ASC`,
+    [campaignId]
+  );
+  return res.status(200).json({enrollments: rows});
 }
 
 export async function updateAllocation(req, res) {
@@ -184,8 +178,7 @@ export async function updateAllocation(req, res) {
     return res.status(200).json({enrollment: rows[0]});
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("updateAllocation error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   } finally {
     client.release();
   }

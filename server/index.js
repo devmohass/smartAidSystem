@@ -11,6 +11,8 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import reportsRoutes from "./routes/reports.routes.js";
 import auditLogsRoutes from "./routes/auditLogs.routes.js";
 import auditLogger from "./middleware/auditLogger.js";
+import notFoundHandler from "./middleware/notFoundHandler.js";
+import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 
@@ -40,6 +42,11 @@ app.use("/api/transactions", transactionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/audit-logs", auditLogsRoutes);
+
+// Unknown routes -> JSON 404, anything thrown by a handler -> centralized 500.
+// Must come AFTER all app.use("/api/...") mounts.
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

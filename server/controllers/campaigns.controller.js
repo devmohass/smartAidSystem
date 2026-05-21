@@ -4,31 +4,20 @@ const SELECT_FIELDS = `id, title, location, start_date, end_date, budget,
                        status, created_by, created_at`;
 
 export async function listCampaigns(_req, res) {
-  try {
-    const {rows} = await pool.query(
-      `SELECT ${SELECT_FIELDS} FROM campaigns ORDER BY id ASC`
-    );
-    return res.status(200).json({campaigns: rows});
-  } catch (err) {
-    console.error("listCampaigns error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT ${SELECT_FIELDS} FROM campaigns ORDER BY id ASC`
+  );
+  return res.status(200).json({campaigns: rows});
 }
 
 export async function getCampaign(req, res) {
   const {id} = req.params;
-
-  try {
-    const {rows} = await pool.query(
-      `SELECT ${SELECT_FIELDS} FROM campaigns WHERE id = $1`,
-      [id]
-    );
-    if (!rows[0]) return res.status(404).json({error: "Campaign not found"});
-    return res.status(200).json({campaign: rows[0]});
-  } catch (err) {
-    console.error("getCampaign error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT ${SELECT_FIELDS} FROM campaigns WHERE id = $1`,
+    [id]
+  );
+  if (!rows[0]) return res.status(404).json({error: "Campaign not found"});
+  return res.status(200).json({campaign: rows[0]});
 }
 
 export async function createCampaign(req, res) {
@@ -40,18 +29,13 @@ export async function createCampaign(req, res) {
   const startStr = start_date.toISOString().slice(0, 10);
   const endStr = end_date.toISOString().slice(0, 10);
 
-  try {
-    const {rows} = await pool.query(
-      `INSERT INTO campaigns (title, location, start_date, end_date, budget, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING ${SELECT_FIELDS}`,
-      [title, location ?? null, startStr, endStr, budget, req.user.id]
-    );
-    return res.status(201).json({campaign: rows[0]});
-  } catch (err) {
-    console.error("createCampaign error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `INSERT INTO campaigns (title, location, start_date, end_date, budget, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING ${SELECT_FIELDS}`,
+    [title, location ?? null, startStr, endStr, budget, req.user.id]
+  );
+  return res.status(201).json({campaign: rows[0]});
 }
 
 async function activateCampaign(client, campaign) {
@@ -143,47 +127,42 @@ async function closeCampaign(client, campaign) {
 export async function getCampaignSummary(req, res) {
   const {id} = req.params;
 
-  try {
-    const {rows: campaignRows} = await pool.query(
-      `SELECT id, title, location, start_date, end_date, budget, status, created_by, created_at
-       FROM campaigns WHERE id = $1`,
-      [id]
-    );
-    const campaign = campaignRows[0];
-    if (!campaign) return res.status(404).json({error: "Campaign not found"});
+  const {rows: campaignRows} = await pool.query(
+    `SELECT id, title, location, start_date, end_date, budget, status, created_by, created_at
+     FROM campaigns WHERE id = $1`,
+    [id]
+  );
+  const campaign = campaignRows[0];
+  if (!campaign) return res.status(404).json({error: "Campaign not found"});
 
-    const {rows: enrollRows} = await pool.query(
-      `SELECT COALESCE(SUM(allocated_balance), 0)::float AS total_allocated,
-              COALESCE(SUM(remaining_balance), 0)::float AS total_remaining_in_wallets,
-              COUNT(*)::int AS beneficiary_count
-       FROM campaign_beneficiaries WHERE campaign_id = $1`,
-      [id]
-    );
-    const {rows: txnRows} = await pool.query(
-      `SELECT COUNT(*)::int AS transaction_count,
-              COALESCE(SUM(amount), 0)::float AS total_spent
-       FROM transactions WHERE campaign_id = $1`,
-      [id]
-    );
+  const {rows: enrollRows} = await pool.query(
+    `SELECT COALESCE(SUM(allocated_balance), 0)::float AS total_allocated,
+            COALESCE(SUM(remaining_balance), 0)::float AS total_remaining_in_wallets,
+            COUNT(*)::int AS beneficiary_count
+     FROM campaign_beneficiaries WHERE campaign_id = $1`,
+    [id]
+  );
+  const {rows: txnRows} = await pool.query(
+    `SELECT COUNT(*)::int AS transaction_count,
+            COALESCE(SUM(amount), 0)::float AS total_spent
+     FROM transactions WHERE campaign_id = $1`,
+    [id]
+  );
 
-    const budget = Number(campaign.budget);
-    const totalAllocated = enrollRows[0].total_allocated;
+  const budget = Number(campaign.budget);
+  const totalAllocated = enrollRows[0].total_allocated;
 
-    return res.status(200).json({
-      summary: {
-        campaign,
-        beneficiary_count: enrollRows[0].beneficiary_count,
-        total_allocated: totalAllocated,
-        unallocated_budget: budget - totalAllocated,
-        total_spent: txnRows[0].total_spent,
-        total_remaining_in_wallets: enrollRows[0].total_remaining_in_wallets,
-        transaction_count: txnRows[0].transaction_count,
-      },
-    });
-  } catch (err) {
-    console.error("getCampaignSummary error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  return res.status(200).json({
+    summary: {
+      campaign,
+      beneficiary_count: enrollRows[0].beneficiary_count,
+      total_allocated: totalAllocated,
+      unallocated_budget: budget - totalAllocated,
+      total_spent: txnRows[0].total_spent,
+      total_remaining_in_wallets: enrollRows[0].total_remaining_in_wallets,
+      transaction_count: txnRows[0].transaction_count,
+    },
+  });
 }
 
 export async function changeCampaignStatus(req, res) {
@@ -227,11 +206,9 @@ export async function changeCampaignStatus(req, res) {
     return res.status(200).json(result);
   } catch (err) {
     await client.query("ROLLBACK");
-    if (err && err.http) {
-      return res.status(err.http).json({error: err.message, ...(err.details ? {details: err.details} : {})});
-    }
-    console.error("changeCampaignStatus error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    // The activate/close helpers throw {http, message, details}; the
+    // errorHandler middleware understands that shape.
+    throw err;
   } finally {
     client.release();
   }

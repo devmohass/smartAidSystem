@@ -1,48 +1,31 @@
 import pool from "../db.js";
 
 export async function listShops(_req, res) {
-  try {
-    const {rows} = await pool.query(
-      "SELECT id, name, location, owner_name, created_by, created_at FROM shops ORDER BY id ASC"
-    );
-    return res.status(200).json({shops: rows});
-  } catch (err) {
-    console.error("listShops error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    "SELECT id, name, location, owner_name, created_by, created_at FROM shops ORDER BY id ASC"
+  );
+  return res.status(200).json({shops: rows});
 }
 
 export async function getShop(req, res) {
   const {id} = req.params;
-
-  try {
-    const {rows} = await pool.query(
-      "SELECT id, name, location, owner_name, created_by, created_at FROM shops WHERE id = $1",
-      [id]
-    );
-    if (!rows[0]) return res.status(404).json({error: "Shop not found"});
-    return res.status(200).json({shop: rows[0]});
-  } catch (err) {
-    console.error("getShop error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    "SELECT id, name, location, owner_name, created_by, created_at FROM shops WHERE id = $1",
+    [id]
+  );
+  if (!rows[0]) return res.status(404).json({error: "Shop not found"});
+  return res.status(200).json({shop: rows[0]});
 }
 
 export async function createShop(req, res) {
   const {name, location, owner_name} = req.body;
-
-  try {
-    const {rows} = await pool.query(
-      `INSERT INTO shops (name, location, owner_name, created_by)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, location, owner_name, created_by, created_at`,
-      [name, location ?? null, owner_name ?? null, req.user.id]
-    );
-    return res.status(201).json({shop: rows[0]});
-  } catch (err) {
-    console.error("createShop error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `INSERT INTO shops (name, location, owner_name, created_by)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, name, location, owner_name, created_by, created_at`,
+    [name, location ?? null, owner_name ?? null, req.user.id]
+  );
+  return res.status(201).json({shop: rows[0]});
 }
 
 export async function updateShop(req, res) {
@@ -66,42 +49,32 @@ export async function updateShop(req, res) {
   }
   values.push(id);
 
-  try {
-    const {rows} = await pool.query(
-      `UPDATE shops SET ${fields.join(", ")} WHERE id = $${i}
-       RETURNING id, name, location, owner_name, created_by, created_at`,
-      values
-    );
-    if (!rows[0]) return res.status(404).json({error: "Shop not found"});
-    return res.status(200).json({shop: rows[0]});
-  } catch (err) {
-    console.error("updateShop error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `UPDATE shops SET ${fields.join(", ")} WHERE id = $${i}
+     RETURNING id, name, location, owner_name, created_by, created_at`,
+    values
+  );
+  if (!rows[0]) return res.status(404).json({error: "Shop not found"});
+  return res.status(200).json({shop: rows[0]});
 }
 
 export async function listShopManagers(req, res) {
   const {id} = req.params;
 
-  try {
-    const shopExists = await pool.query("SELECT 1 FROM shops WHERE id = $1", [id]);
-    if (shopExists.rowCount === 0) {
-      return res.status(404).json({error: "Shop not found"});
-    }
-
-    const {rows} = await pool.query(
-      `SELECT sm.id AS assignment_id, u.id AS user_id, u.name, u.email
-       FROM shop_managers sm
-       JOIN users u ON u.id = sm.user_id
-       WHERE sm.shop_id = $1
-       ORDER BY u.id ASC`,
-      [id]
-    );
-    return res.status(200).json({managers: rows});
-  } catch (err) {
-    console.error("listShopManagers error:", err);
-    return res.status(500).json({error: "Internal server error"});
+  const shopExists = await pool.query("SELECT 1 FROM shops WHERE id = $1", [id]);
+  if (shopExists.rowCount === 0) {
+    return res.status(404).json({error: "Shop not found"});
   }
+
+  const {rows} = await pool.query(
+    `SELECT sm.id AS assignment_id, u.id AS user_id, u.name, u.email
+     FROM shop_managers sm
+     JOIN users u ON u.id = sm.user_id
+     WHERE sm.shop_id = $1
+     ORDER BY u.id ASC`,
+    [id]
+  );
+  return res.status(200).json({managers: rows});
 }
 
 export async function assignShopManager(req, res) {
@@ -136,9 +109,6 @@ export async function assignShopManager(req, res) {
       [userId, shopId]
     );
     return res.status(201).json({assignment: rows[0]});
-  } catch (err) {
-    console.error("assignShopManager error:", err);
-    return res.status(500).json({error: "Internal server error"});
   } finally {
     client.release();
   }
@@ -147,74 +117,63 @@ export async function assignShopManager(req, res) {
 export async function getShopReport(req, res) {
   const {id} = req.params;
 
-  try {
-    const {rows: shopRows} = await pool.query(
-      "SELECT id, name, location, owner_name, created_at FROM shops WHERE id = $1",
-      [id]
-    );
-    const shop = shopRows[0];
-    if (!shop) return res.status(404).json({error: "Shop not found"});
+  const {rows: shopRows} = await pool.query(
+    "SELECT id, name, location, owner_name, created_at FROM shops WHERE id = $1",
+    [id]
+  );
+  const shop = shopRows[0];
+  if (!shop) return res.status(404).json({error: "Shop not found"});
 
-    const {rows: totalsRows} = await pool.query(
-      `SELECT COUNT(*)::int AS transaction_count,
-              COALESCE(SUM(amount), 0)::float AS total_amount,
-              COUNT(DISTINCT beneficiary_id)::int AS unique_beneficiaries,
-              COUNT(DISTINCT shop_manager_id)::int AS unique_managers
-       FROM transactions WHERE shop_id = $1`,
-      [id]
-    );
+  const {rows: totalsRows} = await pool.query(
+    `SELECT COUNT(*)::int AS transaction_count,
+            COALESCE(SUM(amount), 0)::float AS total_amount,
+            COUNT(DISTINCT beneficiary_id)::int AS unique_beneficiaries,
+            COUNT(DISTINCT shop_manager_id)::int AS unique_managers
+     FROM transactions WHERE shop_id = $1`,
+    [id]
+  );
 
-    const {rows: byCampaign} = await pool.query(
-      `SELECT c.id AS campaign_id, c.title AS campaign_title, c.status AS campaign_status,
-              COUNT(t.id)::int AS transaction_count,
-              COALESCE(SUM(t.amount), 0)::float AS total_amount
-       FROM transactions t
-       JOIN campaigns c ON c.id = t.campaign_id
-       WHERE t.shop_id = $1
-       GROUP BY c.id, c.title, c.status
-       ORDER BY total_amount DESC`,
-      [id]
-    );
+  const {rows: byCampaign} = await pool.query(
+    `SELECT c.id AS campaign_id, c.title AS campaign_title, c.status AS campaign_status,
+            COUNT(t.id)::int AS transaction_count,
+            COALESCE(SUM(t.amount), 0)::float AS total_amount
+     FROM transactions t
+     JOIN campaigns c ON c.id = t.campaign_id
+     WHERE t.shop_id = $1
+     GROUP BY c.id, c.title, c.status
+     ORDER BY total_amount DESC`,
+    [id]
+  );
 
-    const {rows: recent} = await pool.query(
-      `SELECT t.id, t.campaign_id, t.beneficiary_id, t.amount, t.balance_after,
-              t.transaction_at, r.receipt_code
-       FROM transactions t
-       LEFT JOIN receipts r ON r.transaction_id = t.id
-       WHERE t.shop_id = $1
-       ORDER BY t.id DESC
-       LIMIT 10`,
-      [id]
-    );
+  const {rows: recent} = await pool.query(
+    `SELECT t.id, t.campaign_id, t.beneficiary_id, t.amount, t.balance_after,
+            t.transaction_at, r.receipt_code
+     FROM transactions t
+     LEFT JOIN receipts r ON r.transaction_id = t.id
+     WHERE t.shop_id = $1
+     ORDER BY t.id DESC
+     LIMIT 10`,
+    [id]
+  );
 
-    return res.status(200).json({
-      report: {
-        shop,
-        totals: totalsRows[0],
-        by_campaign: byCampaign,
-        recent_transactions: recent,
-      },
-    });
-  } catch (err) {
-    console.error("getShopReport error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  return res.status(200).json({
+    report: {
+      shop,
+      totals: totalsRows[0],
+      by_campaign: byCampaign,
+      recent_transactions: recent,
+    },
+  });
 }
 
 export async function unassignShopManager(req, res) {
   const {id: shopId, userId} = req.params;
-
-  try {
-    const result = await pool.query(
-      "DELETE FROM shop_managers WHERE shop_id = $1 AND user_id = $2",
-      [shopId, userId]
-    );
-    if (result.rowCount === 0) {
-      return res.status(404).json({error: "Assignment not found"});
-    }
-    return res.status(204).send();
-  } catch (err) {
-    console.error("unassignShopManager error:", err);
-    return res.status(500).json({error: "Internal server error"});
+  const result = await pool.query(
+    "DELETE FROM shop_managers WHERE shop_id = $1 AND user_id = $2",
+    [shopId, userId]
+  );
+  if (result.rowCount === 0) {
+    return res.status(404).json({error: "Assignment not found"});
   }
+  return res.status(204).send();
 }

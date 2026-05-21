@@ -4,31 +4,20 @@ import pool from "../db.js";
 const BCRYPT_ROUNDS = 10;
 
 export async function listUsers(_req, res) {
-  try {
-    const {rows} = await pool.query(
-      "SELECT id, name, email, role, created_at FROM users ORDER BY id ASC"
-    );
-    return res.status(200).json({users: rows});
-  } catch (err) {
-    console.error("listUsers error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    "SELECT id, name, email, role, created_at FROM users ORDER BY id ASC"
+  );
+  return res.status(200).json({users: rows});
 }
 
 export async function getUser(req, res) {
   const {id} = req.params;
-
-  try {
-    const {rows} = await pool.query(
-      "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
-      [id]
-    );
-    if (!rows[0]) return res.status(404).json({error: "User not found"});
-    return res.status(200).json({user: rows[0]});
-  } catch (err) {
-    console.error("getUser error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
+    [id]
+  );
+  if (!rows[0]) return res.status(404).json({error: "User not found"});
+  return res.status(200).json({user: rows[0]});
 }
 
 export async function createUser(req, res) {
@@ -62,8 +51,7 @@ export async function createUser(req, res) {
     if (err.code === "23505") {
       return res.status(409).json({error: "Email already in use"});
     }
-    console.error("createUser error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   } finally {
     client.release();
   }
@@ -98,8 +86,7 @@ export async function updateUser(req, res) {
     if (err.code === "23505") {
       return res.status(409).json({error: "Email already in use"});
     }
-    console.error("updateUser error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   }
 }
 
@@ -122,7 +109,6 @@ export async function deleteUser(req, res) {
         error: "Cannot delete user: they have related records (transactions, campaigns, etc.)",
       });
     }
-    console.error("deleteUser error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   }
 }

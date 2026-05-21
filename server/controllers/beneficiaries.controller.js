@@ -5,53 +5,37 @@ const SELECT_FIELDS = `id, name, phone_number, qr_code, profile_image_url,
                        family_size, location, created_by, created_at`;
 
 export async function listBeneficiaries(_req, res) {
-  try {
-    const {rows} = await pool.query(
-      `SELECT ${SELECT_FIELDS} FROM beneficiaries ORDER BY id ASC`
-    );
-    return res.status(200).json({beneficiaries: rows});
-  } catch (err) {
-    console.error("listBeneficiaries error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT ${SELECT_FIELDS} FROM beneficiaries ORDER BY id ASC`
+  );
+  return res.status(200).json({beneficiaries: rows});
 }
 
 export async function searchBeneficiary(req, res) {
   const {phone, qr_code: qrCode} = req.query;
 
-  try {
-    const {rows} = phone
-      ? await pool.query(
-          `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE phone_number = $1`,
-          [phone]
-        )
-      : await pool.query(
-          `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE qr_code = $1`,
-          [qrCode]
-        );
+  const {rows} = phone
+    ? await pool.query(
+        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE phone_number = $1`,
+        [phone]
+      )
+    : await pool.query(
+        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE qr_code = $1`,
+        [qrCode]
+      );
 
-    if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
-    return res.status(200).json({beneficiary: rows[0]});
-  } catch (err) {
-    console.error("searchBeneficiary error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
+  return res.status(200).json({beneficiary: rows[0]});
 }
 
 export async function getBeneficiary(req, res) {
   const {id} = req.params;
-
-  try {
-    const {rows} = await pool.query(
-      `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE id = $1`,
-      [id]
-    );
-    if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
-    return res.status(200).json({beneficiary: rows[0]});
-  } catch (err) {
-    console.error("getBeneficiary error:", err);
-    return res.status(500).json({error: "Internal server error"});
-  }
+  const {rows} = await pool.query(
+    `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE id = $1`,
+    [id]
+  );
+  if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
+  return res.status(200).json({beneficiary: rows[0]});
 }
 
 export async function createBeneficiary(req, res) {
@@ -80,8 +64,7 @@ export async function createBeneficiary(req, res) {
       const field = err.constraint?.includes("phone") ? "phone_number" : "qr_code";
       return res.status(409).json({error: `${field} already in use`});
     }
-    console.error("createBeneficiary error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   }
 }
 
@@ -126,7 +109,6 @@ export async function updateBeneficiary(req, res) {
     if (err.code === "23505") {
       return res.status(409).json({error: "phone_number already in use"});
     }
-    console.error("updateBeneficiary error:", err);
-    return res.status(500).json({error: "Internal server error"});
+    throw err;
   }
 }
