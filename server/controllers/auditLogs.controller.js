@@ -1,50 +1,20 @@
 import pool from "../db.js";
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
-
-function parseOptionalId(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
-}
-
-function parseOptionalDate(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-
-function parseLimit(value) {
-  if (value === undefined || value === null || value === "") return DEFAULT_LIMIT;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) return undefined;
-  return Math.min(n, MAX_LIMIT);
-}
-
-function parseOffset(value) {
-  if (value === undefined || value === null || value === "") return 0;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0) return undefined;
-  return n;
-}
-
 export async function listAuditLogs(req, res) {
-  const userId = parseOptionalId(req.query.user_id);
-  const action = req.query.action ? String(req.query.action) : null;
-  const entityType = req.query.entity_type ? String(req.query.entity_type) : null;
-  const entityId = parseOptionalId(req.query.entity_id);
-  const from = parseOptionalDate(req.query.from);
-  const to = parseOptionalDate(req.query.to);
-  const limit = parseLimit(req.query.limit);
-  const offset = parseOffset(req.query.offset);
+  const {
+    user_id: userId = null,
+    action = null,
+    entity_type: entityType = null,
+    entity_id: entityId = null,
+    from = null,
+    to = null,
+    limit,
+    offset,
+  } = req.query;
 
-  if (userId === undefined) return res.status(400).json({error: "user_id must be a positive integer"});
-  if (entityId === undefined) return res.status(400).json({error: "entity_id must be a positive integer"});
-  if (from === undefined) return res.status(400).json({error: "from must be a valid date"});
-  if (to === undefined) return res.status(400).json({error: "to must be a valid date"});
-  if (limit === undefined) return res.status(400).json({error: "limit must be a positive integer"});
-  if (offset === undefined) return res.status(400).json({error: "offset must be a non-negative integer"});
+  // Joi gives Date objects for from/to; pg expects ISO strings for timestamptz casts.
+  const fromIso = from ? new Date(from).toISOString() : null;
+  const toIso = to ? new Date(to).toISOString() : null;
 
   try {
     const {rows} = await pool.query(
@@ -60,7 +30,7 @@ export async function listAuditLogs(req, res) {
          AND ($6::timestamptz IS NULL OR al.logged_at <= $6::timestamptz)
        ORDER BY al.id DESC
        LIMIT $7 OFFSET $8`,
-      [userId, action, entityType, entityId, from, to, limit, offset]
+      [userId, action, entityType, entityId, fromIso, toIso, limit, offset]
     );
 
     const {rows: countRows} = await pool.query(
@@ -72,11 +42,18 @@ export async function listAuditLogs(req, res) {
          AND ($4::int IS NULL OR al.entity_id = $4)
          AND ($5::timestamptz IS NULL OR al.logged_at >= $5::timestamptz)
          AND ($6::timestamptz IS NULL OR al.logged_at <= $6::timestamptz)`,
-      [userId, action, entityType, entityId, from, to]
+      [userId, action, entityType, entityId, fromIso, toIso]
     );
 
     return res.status(200).json({
-      filters: {user_id: userId, action, entity_type: entityType, entity_id: entityId, from, to},
+      filters: {
+        user_id: userId,
+        action,
+        entity_type: entityType,
+        entity_id: entityId,
+        from: fromIso,
+        to: toIso,
+      },
       pagination: {limit, offset, total: countRows[0].total},
       audit_logs: rows,
     });
