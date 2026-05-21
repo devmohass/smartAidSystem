@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 export async function enrollBeneficiary(req, res) {
   const {id: campaignId} = req.params;
@@ -65,7 +66,7 @@ export async function enrollBeneficiary(req, res) {
     );
 
     await client.query("COMMIT");
-    return res.status(201).json({enrollment: rows[0]});
+    return ok(res, rows[0], 201);
   } catch (err) {
     await client.query("ROLLBACK");
     if (err.code === "23505") {
@@ -95,7 +96,7 @@ export async function listEnrollments(req, res) {
      ORDER BY cb.id ASC`,
     [campaignId]
   );
-  return res.status(200).json({enrollments: rows});
+  return ok(res, rows);
 }
 
 export async function updateAllocation(req, res) {
@@ -175,7 +176,7 @@ export async function updateAllocation(req, res) {
     );
 
     await client.query("COMMIT");
-    return res.status(200).json({enrollment: rows[0]});
+    return ok(res, rows[0]);
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

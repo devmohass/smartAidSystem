@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 export async function reportTransactions(req, res) {
   const {
@@ -45,7 +46,10 @@ export async function reportTransactions(req, res) {
     [campaignId, beneficiaryId, shopId, managerId, fromIso, toIso]
   );
 
+  // Paginated list: data + sibling pagination/filters keys.
   return res.status(200).json({
+    data: rows,
+    pagination: {limit, offset, total: countRows[0].total},
     filters: {
       campaign_id: campaignId,
       beneficiary_id: beneficiaryId,
@@ -54,8 +58,6 @@ export async function reportTransactions(req, res) {
       from: fromIso,
       to: toIso,
     },
-    pagination: {limit, offset, total: countRows[0].total},
-    transactions: rows,
   });
 }
 
@@ -85,5 +87,5 @@ export async function reportCampaigns(_req, res) {
     ORDER BY c.id ASC
   `);
 
-  return res.status(200).json({campaigns: rows});
+  return ok(res, rows);
 }

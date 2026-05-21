@@ -54,7 +54,7 @@ Content-Type: application/json
 ### SETUP 1 — Create a donor user (logs: CREATE_USER, entity_type=user)
 # @name createDonor
 POST {{host}}/api/users
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -65,8 +65,8 @@ Content-Type: application/json
 }
 
 ### SETUP 2 — Update that donor (logs: UPDATE_USER, entity_id={{createDonor.id}})
-PUT {{host}}/api/users/{{createDonor.response.body.user.id}}
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/users/{{createDonor.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -76,7 +76,7 @@ Content-Type: application/json
 ### SETUP 3 — Create a beneficiary (logs: CREATE_BENEFICIARY, entity_type=beneficiary)
 # @name createBen
 POST {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -87,8 +87,8 @@ Content-Type: application/json
 }
 
 ### SETUP 4 — Update that beneficiary (logs: UPDATE_BENEFICIARY, entity_id={{createBen.id}})
-PUT {{host}}/api/beneficiaries/{{createBen.response.body.beneficiary.id}}
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/beneficiaries/{{createBen.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -96,8 +96,8 @@ Content-Type: application/json
 }
 
 ### SETUP 5 — Delete the donor (logs: DELETE_USER, entity_id={{createDonor.id}})
-DELETE {{host}}/api/users/{{createDonor.response.body.user.id}}
-Authorization: Bearer {{login.response.body.token}}
+DELETE {{host}}/api/users/{{createDonor.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### LIST — no filters
@@ -109,7 +109,7 @@ Authorization: Bearer {{login.response.body.token}}
 # audit_logs[0] should be the most recent write (latest id DESC). Each row
 # carries: id, user_id, user_email, user_role, action, entity_type, entity_id, logged_at.
 GET {{host}}/api/audit-logs
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### FILTER — by user_id
@@ -118,12 +118,12 @@ Authorization: Bearer {{login.response.body.token}}
 ### 2) Filter by user_id=1 (admin user from seed)
 # Expected: 200, every row has user_id=1 (all SETUP writes were as admin)
 GET {{host}}/api/audit-logs?user_id=1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 3) Filter by user_id that has no writes
 # Expected: 200, audit_logs = [], pagination.total = 0
 GET {{host}}/api/audit-logs?user_id=9999
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### FILTER — by action
@@ -133,24 +133,24 @@ Authorization: Bearer {{login.response.body.token}}
 # Expected: 200, every row has action='CREATE_USER'
 #           SETUP 1 should appear in the results
 GET {{host}}/api/audit-logs?action=CREATE_USER
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 5) Filter by action=UPDATE_BENEFICIARY
 # Expected: 200, every row has action='UPDATE_BENEFICIARY'
 #           SETUP 4 should appear in the results
 GET {{host}}/api/audit-logs?action=UPDATE_BENEFICIARY
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 6) Filter by action=DELETE_USER
 # Expected: 200, every row has action='DELETE_USER'
 #           SETUP 5 should appear in the results
 GET {{host}}/api/audit-logs?action=DELETE_USER
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 7) Filter by action that does not exist
 # Expected: 200, audit_logs = [], total = 0
 GET {{host}}/api/audit-logs?action=CREATE_NONEXISTENT
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### FILTER — by entity_type
@@ -160,13 +160,13 @@ Authorization: Bearer {{login.response.body.token}}
 # Expected: 200, every row has entity_type='user'
 #           SETUP 1, 2, 5 should appear
 GET {{host}}/api/audit-logs?entity_type=user
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 9) Filter by entity_type=beneficiary
 # Expected: 200, every row has entity_type='beneficiary'
 #           SETUP 3, 4 should appear
 GET {{host}}/api/audit-logs?entity_type=beneficiary
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### FILTER — by entity_id
@@ -174,18 +174,18 @@ Authorization: Bearer {{login.response.body.token}}
 
 ### 10) Filter by entity_id = the donor we created (SETUP 1)
 # Expected: 200, returns CREATE_USER + UPDATE_USER + DELETE_USER on that id
-GET {{host}}/api/audit-logs?entity_id={{createDonor.response.body.user.id}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/audit-logs?entity_id={{createDonor.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 11) Combined: entity_type=user AND entity_id=<created donor>
 # Expected: 200, narrower than #10 (same rows, since all on user entity)
-GET {{host}}/api/audit-logs?entity_type=user&entity_id={{createDonor.response.body.user.id}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/audit-logs?entity_type=user&entity_id={{createDonor.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 12) Combined: action=UPDATE_BENEFICIARY AND entity_id=<created ben>
 # Expected: 200, returns just SETUP 4
-GET {{host}}/api/audit-logs?action=UPDATE_BENEFICIARY&entity_id={{createBen.response.body.beneficiary.id}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/audit-logs?action=UPDATE_BENEFICIARY&entity_id={{createBen.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### FILTER — by date range
@@ -196,22 +196,22 @@ Authorization: Bearer {{login.response.body.token}}
 ### 13) Date range — today only
 # Expected: 200, includes all SETUP rows (they were inserted today)
 GET {{host}}/api/audit-logs?from=2026-05-21T00:00:00Z&to=2026-05-21T23:59:59Z
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 14) Date range — far past (year 2000)
 # Expected: 200, audit_logs = [], total = 0
 GET {{host}}/api/audit-logs?from=2000-01-01T00:00:00Z&to=2000-12-31T23:59:59Z
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 15) Only `from` (open-ended upper bound)
 # Expected: 200, all rows from that point onward
 GET {{host}}/api/audit-logs?from=2026-01-01T00:00:00Z
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 16) Only `to` (open-ended lower bound)
 # Expected: 200, all rows up to that point
 GET {{host}}/api/audit-logs?to=2026-12-31T23:59:59Z
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### PAGINATION
@@ -220,17 +220,17 @@ Authorization: Bearer {{login.response.body.token}}
 ### 17) Pagination — limit=1
 # Expected: 200, audit_logs.length == 1, pagination.total = full count
 GET {{host}}/api/audit-logs?limit=1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 18) Pagination — limit=2 offset=1
 # Expected: 200, returns the 2nd & 3rd rows (latest-id DESC)
 GET {{host}}/api/audit-logs?limit=2&offset=1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 19) Pagination — limit above MAX_LIMIT (500) is clamped to 500
 # Expected: 200, pagination.limit == 500
 GET {{host}}/api/audit-logs?limit=9999
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### BAD INPUT — 400 cases
@@ -239,42 +239,42 @@ Authorization: Bearer {{login.response.body.token}}
 ### 20) user_id is not an integer
 # Expected: 400 { "error": "user_id must be a positive integer" }
 GET {{host}}/api/audit-logs?user_id=abc
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 21) user_id is negative
 # Expected: 400
 GET {{host}}/api/audit-logs?user_id=-1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 22) entity_id is not an integer
 # Expected: 400 { "error": "entity_id must be a positive integer" }
 GET {{host}}/api/audit-logs?entity_id=xyz
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 23) from is not a valid date
 # Expected: 400 { "error": "from must be a valid date" }
 GET {{host}}/api/audit-logs?from=not-a-date
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 24) to is not a valid date
 # Expected: 400 { "error": "to must be a valid date" }
 GET {{host}}/api/audit-logs?to=garbage
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 25) limit is negative
 # Expected: 400 { "error": "limit must be a positive integer" }
 GET {{host}}/api/audit-logs?limit=-5
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 26) limit is zero
 # Expected: 400 (controller requires limit > 0)
 GET {{host}}/api/audit-logs?limit=0
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 27) offset is negative
 # Expected: 400 { "error": "offset must be a non-negative integer" }
 GET {{host}}/api/audit-logs?offset=-1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 #######################################################################
 ### AUTH / ROLE GUARDS
@@ -287,12 +287,12 @@ GET {{host}}/api/audit-logs
 ### 29) As donor
 # Expected: 403 { "error": "Forbidden: insufficient role" }
 GET {{host}}/api/audit-logs
-Authorization: Bearer {{loginDonor.response.body.token}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 
 ### 30) As shop_manager
 # Expected: 403 { "error": "Forbidden: insufficient role" }
 GET {{host}}/api/audit-logs
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 
 #######################################################################
 ### SELF-CHECK — confirm the GET above did NOT add an audit_logs row
@@ -303,4 +303,4 @@ Authorization: Bearer {{loginManager.response.body.token}}
 ### 31) Final list — total should match what we had earlier
 # Expected: pagination.total identical to what #1 returned
 GET {{host}}/api/audit-logs?limit=1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}

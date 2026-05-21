@@ -41,7 +41,7 @@ Content-Type: application/json
 ### SETUP 1 — Create a fresh draft campaign (budget 800)
 # @name createCampaign
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -53,8 +53,8 @@ Content-Type: application/json
 }
 
 ### SETUP 2 — Enroll beneficiary id=1 (allocated 500)
-POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+POST {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -63,8 +63,8 @@ Content-Type: application/json
 }
 
 ### SETUP 3 — Enroll beneficiary id=2 (allocated 300)
-POST {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+POST {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -73,8 +73,8 @@ Content-Type: application/json
 }
 
 ### SETUP 4 — Activate the campaign
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -84,7 +84,7 @@ Content-Type: application/json
 ### SETUP 5 — Create a SECOND draft campaign (will stay draft, for "not active" test)
 # @name draftCampaign
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -95,8 +95,8 @@ Content-Type: application/json
 }
 
 ### SETUP 6 — Enroll ben id=1 into draft campaign (still draft)
-POST {{host}}/api/campaigns/{{draftCampaign.response.body.campaign.id}}/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+POST {{host}}/api/campaigns/{{draftCampaign.response.body.data.id}}/beneficiaries
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -114,7 +114,7 @@ POST {{host}}/api/transactions
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 50
@@ -122,11 +122,11 @@ Content-Type: application/json
 
 ### 2) POST as ADMIN -> 403 (only shop_manager can process)
 POST {{host}}/api/transactions
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 50
@@ -134,11 +134,11 @@ Content-Type: application/json
 
 ### 3) POST as DONOR -> 403
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginDonor.response.body.token}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 50
@@ -146,18 +146,18 @@ Content-Type: application/json
 
 ### 4) Missing required fields -> 400
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {}
 
 ### 5) Negative amount -> 400
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": -10
@@ -165,11 +165,11 @@ Content-Type: application/json
 
 ### 6) Zero amount -> 400
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 0
@@ -177,7 +177,7 @@ Content-Type: application/json
 
 ### 7) Non-existent campaign -> 404
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -189,11 +189,11 @@ Content-Type: application/json
 
 ### 8) Campaign exists but is DRAFT -> 409
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{draftCampaign.response.body.campaign.id}},
+  "campaign_id": {{draftCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 50
@@ -201,11 +201,11 @@ Content-Type: application/json
 
 ### 9) Beneficiary not enrolled in this campaign (ben id=3 was not enrolled) -> 409
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 3,
   "shop_id": 1,
   "amount": 50
@@ -215,11 +215,11 @@ Content-Type: application/json
 # Seeded manager is on shop id=1. shop id=2 should return 403.
 # Expected: 403 "You are not assigned to this shop"
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 2,
   "amount": 50
@@ -228,11 +228,11 @@ Content-Type: application/json
 ### 11) Insufficient balance (ben 1 has 500 allocated, ask 600) -> 409
 # Expected: 409 with details { remaining_balance: 500, requested: 600 }
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 600
@@ -244,11 +244,11 @@ Content-Type: application/json
 # receipt.receipt_code format: RCP-YYYYMMDD-XXXX
 # @name txn1
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 120,
@@ -259,11 +259,11 @@ Content-Type: application/json
 # Expected: balance_before == 380, balance_after == 300, receipt seq increments
 # @name txn2
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 80,
@@ -274,11 +274,11 @@ Content-Type: application/json
 # Expected: balance_before == 300, balance_after == 200
 # @name txn3
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 2,
   "shop_id": 1,
   "amount": 100,
@@ -289,11 +289,11 @@ Content-Type: application/json
 # Expected: 201, balance_after == 0
 # @name txn4
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 2,
   "shop_id": 1,
   "amount": 200,
@@ -303,11 +303,11 @@ Content-Type: application/json
 ### 16) Ben 2 now has 0 — try to spend 1 more
 # Expected: 409 insufficient balance, remaining_balance: 0
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 2,
   "shop_id": 1,
   "amount": 1
@@ -316,36 +316,36 @@ Content-Type: application/json
 ### 17) GET /api/transactions as admin
 # Expected: 200, list with the txns we just created (latest first), each with receipt_code
 GET {{host}}/api/transactions
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 18) GET /api/transactions as donor
 # Expected: 200 (donor is read-only)
 GET {{host}}/api/transactions
-Authorization: Bearer {{loginDonor.response.body.token}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 
 ### 19) GET /api/transactions as shop_manager
 # Expected: 403 (per brief — shop_manager creates, admin/donor reads)
 GET {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 
 ### 20) GET /api/transactions/:id (use id captured from txn1)
 # Expected: 200 with receipt_code joined into the response
-GET {{host}}/api/transactions/{{txn1.response.body.transaction.id}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/transactions/{{txn1.response.body.data.transaction.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 21) GET /api/transactions/9999
 # Expected: 404
 GET {{host}}/api/transactions/9999
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 22) GET /api/transactions/:id as donor (should work)
-GET {{host}}/api/transactions/{{txn1.response.body.transaction.id}}
-Authorization: Bearer {{loginDonor.response.body.token}}
+GET {{host}}/api/transactions/{{txn1.response.body.data.transaction.id}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 
 ### 23) Close the campaign, then try a transaction — should be blocked
 # Step A: close
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -355,11 +355,11 @@ Content-Type: application/json
 ### 24) Now try a txn on the closed campaign
 # Expected: 409 "Cannot process: campaign is 'closed'"
 POST {{host}}/api/transactions
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 Content-Type: application/json
 
 {
-  "campaign_id": {{createCampaign.response.body.campaign.id}},
+  "campaign_id": {{createCampaign.response.body.data.id}},
   "beneficiary_id": 1,
   "shop_id": 1,
   "amount": 10

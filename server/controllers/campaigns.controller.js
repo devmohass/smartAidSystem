@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 const SELECT_FIELDS = `id, title, location, start_date, end_date, budget,
                        status, created_by, created_at`;
@@ -7,7 +8,7 @@ export async function listCampaigns(_req, res) {
   const {rows} = await pool.query(
     `SELECT ${SELECT_FIELDS} FROM campaigns ORDER BY id ASC`
   );
-  return res.status(200).json({campaigns: rows});
+  return ok(res, rows);
 }
 
 export async function getCampaign(req, res) {
@@ -17,7 +18,7 @@ export async function getCampaign(req, res) {
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Campaign not found"});
-  return res.status(200).json({campaign: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function createCampaign(req, res) {
@@ -35,7 +36,7 @@ export async function createCampaign(req, res) {
      RETURNING ${SELECT_FIELDS}`,
     [title, location ?? null, startStr, endStr, budget, req.user.id]
   );
-  return res.status(201).json({campaign: rows[0]});
+  return ok(res, rows[0], 201);
 }
 
 async function activateCampaign(client, campaign) {
@@ -152,16 +153,14 @@ export async function getCampaignSummary(req, res) {
   const budget = Number(campaign.budget);
   const totalAllocated = enrollRows[0].total_allocated;
 
-  return res.status(200).json({
-    summary: {
-      campaign,
-      beneficiary_count: enrollRows[0].beneficiary_count,
-      total_allocated: totalAllocated,
-      unallocated_budget: budget - totalAllocated,
-      total_spent: txnRows[0].total_spent,
-      total_remaining_in_wallets: enrollRows[0].total_remaining_in_wallets,
-      transaction_count: txnRows[0].transaction_count,
-    },
+  return ok(res, {
+    campaign,
+    beneficiary_count: enrollRows[0].beneficiary_count,
+    total_allocated: totalAllocated,
+    unallocated_budget: budget - totalAllocated,
+    total_spent: txnRows[0].total_spent,
+    total_remaining_in_wallets: enrollRows[0].total_remaining_in_wallets,
+    transaction_count: txnRows[0].transaction_count,
   });
 }
 
@@ -203,7 +202,7 @@ export async function changeCampaignStatus(req, res) {
     }
 
     await client.query("COMMIT");
-    return res.status(200).json(result);
+    return ok(res, result);
   } catch (err) {
     await client.query("ROLLBACK");
     // The activate/close helpers throw {http, message, details}; the

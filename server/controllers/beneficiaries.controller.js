@@ -1,5 +1,6 @@
 import {randomUUID} from "crypto";
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 const SELECT_FIELDS = `id, name, phone_number, qr_code, profile_image_url,
                        family_size, location, created_by, created_at`;
@@ -8,7 +9,7 @@ export async function listBeneficiaries(_req, res) {
   const {rows} = await pool.query(
     `SELECT ${SELECT_FIELDS} FROM beneficiaries ORDER BY id ASC`
   );
-  return res.status(200).json({beneficiaries: rows});
+  return ok(res, rows);
 }
 
 export async function searchBeneficiary(req, res) {
@@ -25,7 +26,7 @@ export async function searchBeneficiary(req, res) {
       );
 
   if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
-  return res.status(200).json({beneficiary: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function getBeneficiary(req, res) {
@@ -35,7 +36,7 @@ export async function getBeneficiary(req, res) {
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
-  return res.status(200).json({beneficiary: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function createBeneficiary(req, res) {
@@ -58,7 +59,7 @@ export async function createBeneficiary(req, res) {
         req.user.id,
       ]
     );
-    return res.status(201).json({beneficiary: rows[0]});
+    return ok(res, rows[0], 201);
   } catch (err) {
     if (err.code === "23505") {
       const field = err.constraint?.includes("phone") ? "phone_number" : "qr_code";
@@ -104,7 +105,7 @@ export async function updateBeneficiary(req, res) {
       values
     );
     if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
-    return res.status(200).json({beneficiary: rows[0]});
+    return ok(res, rows[0]);
   } catch (err) {
     if (err.code === "23505") {
       return res.status(409).json({error: "phone_number already in use"});

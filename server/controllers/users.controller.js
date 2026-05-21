@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -7,7 +8,7 @@ export async function listUsers(_req, res) {
   const {rows} = await pool.query(
     "SELECT id, name, email, role, created_at FROM users ORDER BY id ASC"
   );
-  return res.status(200).json({users: rows});
+  return ok(res, rows);
 }
 
 export async function getUser(req, res) {
@@ -17,7 +18,7 @@ export async function getUser(req, res) {
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "User not found"});
-  return res.status(200).json({user: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function createUser(req, res) {
@@ -45,7 +46,7 @@ export async function createUser(req, res) {
     }
 
     await client.query("COMMIT");
-    return res.status(201).json({user});
+    return ok(res, user, 201);
   } catch (err) {
     await client.query("ROLLBACK");
     if (err.code === "23505") {
@@ -81,7 +82,7 @@ export async function updateUser(req, res) {
       values
     );
     if (!rows[0]) return res.status(404).json({error: "User not found"});
-    return res.status(200).json({user: rows[0]});
+    return ok(res, rows[0]);
   } catch (err) {
     if (err.code === "23505") {
       return res.status(409).json({error: "Email already in use"});

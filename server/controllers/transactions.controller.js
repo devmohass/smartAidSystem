@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 function formatDateYYYYMMDD(date) {
   const y = date.getUTCFullYear();
@@ -103,10 +104,7 @@ export async function processTransaction(req, res) {
     );
 
     await client.query("COMMIT");
-    return res.status(201).json({
-      transaction,
-      receipt: receiptRows[0],
-    });
+    return ok(res, {transaction, receipt: receiptRows[0]}, 201);
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -125,7 +123,7 @@ export async function listTransactions(_req, res) {
      LEFT JOIN receipts r ON r.transaction_id = t.id
      ORDER BY t.id DESC`
   );
-  return res.status(200).json({transactions: rows});
+  return ok(res, rows);
 }
 
 export async function getTransaction(req, res) {
@@ -141,5 +139,5 @@ export async function getTransaction(req, res) {
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Transaction not found"});
-  return res.status(200).json({transaction: rows[0]});
+  return ok(res, rows[0]);
 }

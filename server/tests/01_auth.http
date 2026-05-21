@@ -1,6 +1,6 @@
 ### SmartAid REST tests — Authentication
 ### Run requests top-to-bottom. The token captured in the "login" request is
-### reused via {{login.response.body.token}} in later requests.
+### reused via {{login.response.body.data.token}} in later requests.
 
 @host = http://localhost:3000
 
@@ -65,9 +65,9 @@ Authorization: Bearer not-a-real-token
 ### 8) GET /me with valid admin token
 # Expected: 200 OK, returns { user: { id, name, email, role, created_at } }
 GET {{host}}/api/auth/me
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 9) GET /me with valid shop_manager token
 # Expected: 200 OK, user.role = "shop_manager"
 GET {{host}}/api/auth/me
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}

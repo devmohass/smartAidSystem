@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 export async function getDashboard(_req, res) {
   const {rows} = await pool.query(`
@@ -22,27 +23,25 @@ export async function getDashboard(_req, res) {
   `);
 
   const r = rows[0];
-  return res.status(200).json({
-    dashboard: {
-      totals: {
-        users: r.user_count,
-        shops: r.shop_count,
-        beneficiaries: r.beneficiary_count,
-        transactions: r.transaction_count,
-        transaction_volume: r.transaction_volume,
-      },
-      campaigns: {
-        total: r.campaign_total,
-        draft: r.campaign_draft,
-        active: r.campaign_active,
-        closed: r.campaign_closed,
-      },
-      ngo_accounts: {
-        total_balance: r.ngo_total_balance,
-        total_deposits: r.ngo_total_deposits,
-        total_funded: r.ngo_total_funded,
-        total_refunded: r.ngo_total_refunded,
-      },
+  return ok(res, {
+    totals: {
+      users: r.user_count,
+      shops: r.shop_count,
+      beneficiaries: r.beneficiary_count,
+      transactions: r.transaction_count,
+      transaction_volume: r.transaction_volume,
+    },
+    campaigns: {
+      total: r.campaign_total,
+      draft: r.campaign_draft,
+      active: r.campaign_active,
+      closed: r.campaign_closed,
+    },
+    ngo_accounts: {
+      total_balance: r.ngo_total_balance,
+      total_deposits: r.ngo_total_deposits,
+      total_funded: r.ngo_total_funded,
+      total_refunded: r.ngo_total_refunded,
     },
   });
 }

@@ -31,28 +31,28 @@ GET {{host}}/api/beneficiaries
 ### 2) GET /api/beneficiaries as shop_manager
 # Expected: 403 (list is admin only)
 GET {{host}}/api/beneficiaries
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 
 ### 3) GET /api/beneficiaries as admin (list all)
 # Expected: 200
 GET {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 4) GET /api/beneficiaries/1
 # Expected: 200
 GET {{host}}/api/beneficiaries/1
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 5) GET /api/beneficiaries/9999
 # Expected: 404
 GET {{host}}/api/beneficiaries/9999
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 6) POST create beneficiary (qr_code auto-generated UUID)
 # Expected: 201, qr_code is a UUID like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 # @name createBen
 POST {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -66,7 +66,7 @@ Content-Type: application/json
 ### 7) POST missing phone_number
 # Expected: 400
 POST {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -76,7 +76,7 @@ Content-Type: application/json
 ### 8) POST duplicate phone_number
 # Expected: 409
 POST {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -87,7 +87,7 @@ Content-Type: application/json
 ### 9) POST bad family_size
 # Expected: 400
 POST {{host}}/api/beneficiaries
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -98,8 +98,8 @@ Content-Type: application/json
 
 ### 10) PUT partial update (location only)
 # Expected: 200
-PUT {{host}}/api/beneficiaries/{{createBen.response.body.beneficiary.id}}
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/beneficiaries/{{createBen.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -108,8 +108,8 @@ Content-Type: application/json
 
 ### 11) PUT try to change qr_code — field is silently ignored
 # Expected: 200, qr_code in response UNCHANGED from the original UUID
-PUT {{host}}/api/beneficiaries/{{createBen.response.body.beneficiary.id}}
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/beneficiaries/{{createBen.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -119,8 +119,8 @@ Content-Type: application/json
 
 ### 12) PUT no fields
 # Expected: 400
-PUT {{host}}/api/beneficiaries/{{createBen.response.body.beneficiary.id}}
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/beneficiaries/{{createBen.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {}
@@ -128,29 +128,29 @@ Content-Type: application/json
 ### 13) SEARCH by phone as admin
 # Expected: 200, returns Fadumo Hassan
 GET {{host}}/api/beneficiaries/search?phone=%2B252611111111
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 14) SEARCH by phone as SHOP MANAGER (allowed!)
 # Expected: 200
 GET {{host}}/api/beneficiaries/search?phone=%2B252622222222
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 
 ### 15) SEARCH by phone — unknown number
 # Expected: 404
 GET {{host}}/api/beneficiaries/search?phone=%2B252600000000
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 16) SEARCH by qr_code (using QR captured from request #6)
 # Expected: 200
-GET {{host}}/api/beneficiaries/search?qr_code={{createBen.response.body.beneficiary.qr_code}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/beneficiaries/search?qr_code={{createBen.response.body.data.qr_code}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 17) SEARCH with no query param
 # Expected: 400 { "error": "Provide ?phone= or ?qr_code=" }
 GET {{host}}/api/beneficiaries/search
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 18) SEARCH with BOTH phone and qr_code
 # Expected: 400 { "error": "Provide only one of ?phone= or ?qr_code=" }
 GET {{host}}/api/beneficiaries/search?phone=x&qr_code=y
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}

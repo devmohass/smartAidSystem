@@ -41,22 +41,22 @@ GET {{host}}/api/campaigns
 ### 2) GET /api/campaigns as shop_manager
 # Expected: 403
 GET {{host}}/api/campaigns
-Authorization: Bearer {{loginManager.response.body.token}}
+Authorization: Bearer {{loginManager.response.body.data.token}}
 
 ### 3) GET /api/campaigns as donor (donor IS allowed to read)
 # Expected: 200
 GET {{host}}/api/campaigns
-Authorization: Bearer {{loginDonor.response.body.token}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 
 ### 4) GET /api/campaigns as admin
 # Expected: 200
 GET {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 5) POST as donor (donor is read-only)
 # Expected: 403
 POST {{host}}/api/campaigns
-Authorization: Bearer {{loginDonor.response.body.token}}
+Authorization: Bearer {{loginDonor.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -69,7 +69,7 @@ Content-Type: application/json
 ### 6) POST missing title
 # Expected: 400
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -81,7 +81,7 @@ Content-Type: application/json
 ### 7) POST end_date before start_date
 # Expected: 400
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -94,7 +94,7 @@ Content-Type: application/json
 ### 8) POST negative budget
 # Expected: 400
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -108,7 +108,7 @@ Content-Type: application/json
 # Expected: 201, status="draft"
 # @name createCampaign
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -121,18 +121,18 @@ Content-Type: application/json
 
 ### 10) GET single campaign
 # Expected: 200
-GET {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}
-Authorization: Bearer {{login.response.body.token}}
+GET {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 11) GET non-existent campaign
 # Expected: 404
 GET {{host}}/api/campaigns/9999
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 
 ### 12) Try to skip draft -> closed
 # Expected: 409 "Cannot close: campaign is 'draft'"
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -141,8 +141,8 @@ Content-Type: application/json
 
 ### 13) Bad status value
 # Expected: 400
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -152,8 +152,8 @@ Content-Type: application/json
 ### 14) Activate the campaign (draft -> active)
 # Expected: 200, deducted = 500 from ngo_account, ledger row "campaign_fund"
 # Check pgAdmin: ngo_accounts.balance dropped by 500.
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -162,8 +162,8 @@ Content-Type: application/json
 
 ### 15) Try to activate again (active -> active)
 # Expected: 409
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -174,7 +174,7 @@ Content-Type: application/json
 # Expected: 201 (creation OK) — saves the id for the next request
 # @name bigCampaign
 POST {{host}}/api/campaigns
-Authorization: Bearer {{login.response.body.token}}
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -186,8 +186,8 @@ Content-Type: application/json
 
 ### 17) Activate the huge campaign — insufficient NGO balance
 # Expected: 409 with details { ngo_balance, campaign_budget }
-PUT {{host}}/api/campaigns/{{bigCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{bigCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -198,8 +198,8 @@ Content-Type: application/json
 # Expected: 200, refunded = sum of remaining_balance across enrolled beneficiaries
 # (Since nothing is enrolled yet, refunded = 0)
 # Check pgAdmin: ngo_accounts.balance is back to its pre-activate value.
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {
@@ -208,8 +208,8 @@ Content-Type: application/json
 
 ### 19) Try to close already-closed
 # Expected: 409
-PUT {{host}}/api/campaigns/{{createCampaign.response.body.campaign.id}}/status
-Authorization: Bearer {{login.response.body.token}}
+PUT {{host}}/api/campaigns/{{createCampaign.response.body.data.id}}/status
+Authorization: Bearer {{login.response.body.data.token}}
 Content-Type: application/json
 
 {

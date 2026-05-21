@@ -44,7 +44,10 @@ export async function listAuditLogs(req, res) {
     [userId, action, entityType, entityId, fromIso, toIso]
   );
 
+  // Paginated list: data + sibling pagination/filters keys.
   return res.status(200).json({
+    data: rows,
+    pagination: {limit, offset, total: countRows[0].total},
     filters: {
       user_id: userId,
       action,
@@ -53,7 +56,5 @@ export async function listAuditLogs(req, res) {
       from: fromIso,
       to: toIso,
     },
-    pagination: {limit, offset, total: countRows[0].total},
-    audit_logs: rows,
   });
 }

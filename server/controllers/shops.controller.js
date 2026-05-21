@@ -1,10 +1,11 @@
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 export async function listShops(_req, res) {
   const {rows} = await pool.query(
     "SELECT id, name, location, owner_name, created_by, created_at FROM shops ORDER BY id ASC"
   );
-  return res.status(200).json({shops: rows});
+  return ok(res, rows);
 }
 
 export async function getShop(req, res) {
@@ -14,7 +15,7 @@ export async function getShop(req, res) {
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Shop not found"});
-  return res.status(200).json({shop: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function createShop(req, res) {
@@ -25,7 +26,7 @@ export async function createShop(req, res) {
      RETURNING id, name, location, owner_name, created_by, created_at`,
     [name, location ?? null, owner_name ?? null, req.user.id]
   );
-  return res.status(201).json({shop: rows[0]});
+  return ok(res, rows[0], 201);
 }
 
 export async function updateShop(req, res) {
@@ -55,7 +56,7 @@ export async function updateShop(req, res) {
     values
   );
   if (!rows[0]) return res.status(404).json({error: "Shop not found"});
-  return res.status(200).json({shop: rows[0]});
+  return ok(res, rows[0]);
 }
 
 export async function listShopManagers(req, res) {
@@ -74,7 +75,7 @@ export async function listShopManagers(req, res) {
      ORDER BY u.id ASC`,
     [id]
   );
-  return res.status(200).json({managers: rows});
+  return ok(res, rows);
 }
 
 export async function assignShopManager(req, res) {
@@ -99,7 +100,7 @@ export async function assignShopManager(req, res) {
     if (existing.rowCount > 0) {
       return res.status(409).json({
         error: "User is already assigned to a shop",
-        assigned_shop_id: existing.rows[0].shop_id,
+        details: {assigned_shop_id: existing.rows[0].shop_id},
       });
     }
 
@@ -108,7 +109,7 @@ export async function assignShopManager(req, res) {
        RETURNING id, user_id, shop_id`,
       [userId, shopId]
     );
-    return res.status(201).json({assignment: rows[0]});
+    return ok(res, rows[0], 201);
   } finally {
     client.release();
   }
@@ -156,13 +157,11 @@ export async function getShopReport(req, res) {
     [id]
   );
 
-  return res.status(200).json({
-    report: {
-      shop,
-      totals: totalsRows[0],
-      by_campaign: byCampaign,
-      recent_transactions: recent,
-    },
+  return ok(res, {
+    shop,
+    totals: totalsRows[0],
+    by_campaign: byCampaign,
+    recent_transactions: recent,
   });
 }
 

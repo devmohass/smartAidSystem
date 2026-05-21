@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../db.js";
+import {ok} from "../utils/respond.js";
 
 const JWT_EXPIRES_IN = "24h";
 
@@ -28,7 +29,7 @@ export async function login(req, res) {
     {expiresIn: JWT_EXPIRES_IN}
   );
 
-  return res.status(200).json({
+  return ok(res, {
     token,
     user: {id: user.id, name: user.name, email: user.email, role: user.role},
   });
@@ -41,5 +42,5 @@ export async function me(req, res) {
   );
   const user = rows[0];
   if (!user) return res.status(404).json({error: "User not found"});
-  return res.status(200).json({user});
+  return ok(res, user);
 }
