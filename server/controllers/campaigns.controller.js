@@ -3,24 +3,7 @@ import pool from "../db.js";
 const SELECT_FIELDS = `id, title, location, start_date, end_date, budget,
                        status, created_by, created_at`;
 
-function parseId(value) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function parseDate(value) {
-  if (typeof value !== "string") return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function parseBudget(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return n;
-}
-
-export async function listCampaigns(req, res) {
+export async function listCampaigns(_req, res) {
   try {
     const {rows} = await pool.query(
       `SELECT ${SELECT_FIELDS} FROM campaigns ORDER BY id ASC`
@@ -33,8 +16,7 @@ export async function listCampaigns(req, res) {
 }
 
 export async function getCampaign(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid campaign id"});
+  const {id} = req.params;
 
   try {
     const {rows} = await pool.query(
@@ -50,28 +32,14 @@ export async function getCampaign(req, res) {
 }
 
 export async function createCampaign(req, res) {
-  const {title, location, start_date, end_date, budget} = req.body || {};
-
-  if (!title || typeof title !== "string" || title.trim() === "") {
-    return res.status(400).json({error: "title is required"});
-  }
-  const start = parseDate(start_date);
-  const end = parseDate(end_date);
-  if (!start) return res.status(400).json({error: "start_date is required and must be a valid date"});
-  if (!end) return res.status(400).json({error: "end_date is required and must be a valid date"});
-  if (end < start) return res.status(400).json({error: "end_date must be on or after start_date"});
-
-  const budgetValue = parseBudget(budget);
-  if (budgetValue === null) {
-    return res.status(400).json({error: "budget is required and must be a positive number"});
-  }
+  const {title, location, start_date, end_date, budget} = req.body;
 
   try {
     const {rows} = await pool.query(
       `INSERT INTO campaigns (title, location, start_date, end_date, budget, created_by)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING ${SELECT_FIELDS}`,
-      [title.trim(), location ?? null, start_date, end_date, budgetValue, req.user.id]
+      [title, location ?? null, start_date, end_date, budget, req.user.id]
     );
     return res.status(201).json({campaign: rows[0]});
   } catch (err) {
@@ -167,8 +135,7 @@ async function closeCampaign(client, campaign) {
 }
 
 export async function getCampaignSummary(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid campaign id"});
+  const {id} = req.params;
 
   try {
     const {rows: campaignRows} = await pool.query(
@@ -214,13 +181,8 @@ export async function getCampaignSummary(req, res) {
 }
 
 export async function changeCampaignStatus(req, res) {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({error: "Invalid campaign id"});
-
-  const {status: target} = req.body || {};
-  if (target !== "active" && target !== "closed") {
-    return res.status(400).json({error: "status must be 'active' or 'closed'"});
-  }
+  const {id} = req.params;
+  const {status: target} = req.body;
 
   const client = await pool.connect();
   try {
