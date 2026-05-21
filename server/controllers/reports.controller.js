@@ -1,52 +1,20 @@
 import pool from "../db.js";
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
-
-function parseOptionalId(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
-}
-
-function parseOptionalDate(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-
-function parseLimit(value) {
-  if (value === undefined || value === null || value === "") return DEFAULT_LIMIT;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) return undefined;
-  return Math.min(n, MAX_LIMIT);
-}
-
-function parseOffset(value) {
-  if (value === undefined || value === null || value === "") return 0;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0) return undefined;
-  return n;
-}
-
 export async function reportTransactions(req, res) {
-  const campaignId = parseOptionalId(req.query.campaign_id);
-  const beneficiaryId = parseOptionalId(req.query.beneficiary_id);
-  const shopId = parseOptionalId(req.query.shop_id);
-  const managerId = parseOptionalId(req.query.shop_manager_id);
-  const from = parseOptionalDate(req.query.from);
-  const to = parseOptionalDate(req.query.to);
-  const limit = parseLimit(req.query.limit);
-  const offset = parseOffset(req.query.offset);
+  const {
+    campaign_id: campaignId = null,
+    beneficiary_id: beneficiaryId = null,
+    shop_id: shopId = null,
+    shop_manager_id: managerId = null,
+    from = null,
+    to = null,
+    limit,
+    offset,
+  } = req.query;
 
-  if (campaignId === undefined) return res.status(400).json({error: "campaign_id must be a positive integer"});
-  if (beneficiaryId === undefined) return res.status(400).json({error: "beneficiary_id must be a positive integer"});
-  if (shopId === undefined) return res.status(400).json({error: "shop_id must be a positive integer"});
-  if (managerId === undefined) return res.status(400).json({error: "shop_manager_id must be a positive integer"});
-  if (from === undefined) return res.status(400).json({error: "from must be a valid date"});
-  if (to === undefined) return res.status(400).json({error: "to must be a valid date"});
-  if (limit === undefined) return res.status(400).json({error: "limit must be a positive integer"});
-  if (offset === undefined) return res.status(400).json({error: "offset must be a non-negative integer"});
+  // Joi gives Date objects for from/to; pg expects ISO strings for timestamptz casts.
+  const fromIso = from ? new Date(from).toISOString() : null;
+  const toIso = to ? new Date(to).toISOString() : null;
 
   try {
     const {rows} = await pool.query(
@@ -63,7 +31,7 @@ export async function reportTransactions(req, res) {
          AND ($6::timestamptz IS NULL OR t.transaction_at <= $6::timestamptz)
        ORDER BY t.id DESC
        LIMIT $7 OFFSET $8`,
-      [campaignId, beneficiaryId, shopId, managerId, from, to, limit, offset]
+      [campaignId, beneficiaryId, shopId, managerId, fromIso, toIso, limit, offset]
     );
 
     const {rows: countRows} = await pool.query(
@@ -75,7 +43,7 @@ export async function reportTransactions(req, res) {
          AND ($4::int IS NULL OR t.shop_manager_id = $4)
          AND ($5::timestamptz IS NULL OR t.transaction_at >= $5::timestamptz)
          AND ($6::timestamptz IS NULL OR t.transaction_at <= $6::timestamptz)`,
-      [campaignId, beneficiaryId, shopId, managerId, from, to]
+      [campaignId, beneficiaryId, shopId, managerId, fromIso, toIso]
     );
 
     return res.status(200).json({
@@ -84,8 +52,8 @@ export async function reportTransactions(req, res) {
         beneficiary_id: beneficiaryId,
         shop_id: shopId,
         shop_manager_id: managerId,
-        from,
-        to,
+        from: fromIso,
+        to: toIso,
       },
       pagination: {limit, offset, total: countRows[0].total},
       transactions: rows,
@@ -96,7 +64,7 @@ export async function reportTransactions(req, res) {
   }
 }
 
-export async function reportCampaigns(req, res) {
+export async function reportCampaigns(_req, res) {
   try {
     const {rows} = await pool.query(`
       SELECT
