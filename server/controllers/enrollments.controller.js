@@ -1,27 +1,8 @@
 import pool from "../db.js";
 
-function parseId(value) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function parseAmount(value) {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 export async function enrollBeneficiary(req, res) {
-  const campaignId = parseId(req.params.id);
-  if (!campaignId) return res.status(400).json({error: "Invalid campaign id"});
-
-  const {beneficiary_id, allocated_balance} = req.body || {};
-  const benId = parseId(beneficiary_id);
-  if (!benId) return res.status(400).json({error: "beneficiary_id is required and must be a positive integer"});
-
-  const amount = parseAmount(allocated_balance);
-  if (amount === null) {
-    return res.status(400).json({error: "allocated_balance must be a positive number"});
-  }
+  const {id: campaignId} = req.params;
+  const {beneficiary_id: benId, allocated_balance: amount} = req.body;
 
   const client = await pool.connect();
   try {
@@ -98,8 +79,7 @@ export async function enrollBeneficiary(req, res) {
 }
 
 export async function listEnrollments(req, res) {
-  const campaignId = parseId(req.params.id);
-  if (!campaignId) return res.status(400).json({error: "Invalid campaign id"});
+  const {id: campaignId} = req.params;
 
   try {
     const campaignCheck = await pool.query("SELECT 1 FROM campaigns WHERE id = $1", [campaignId]);
@@ -125,15 +105,8 @@ export async function listEnrollments(req, res) {
 }
 
 export async function updateAllocation(req, res) {
-  const campaignId = parseId(req.params.id);
-  const benId = parseId(req.params.bid);
-  if (!campaignId || !benId) return res.status(400).json({error: "Invalid id"});
-
-  const {allocated_balance} = req.body || {};
-  const newAllocated = parseAmount(allocated_balance);
-  if (newAllocated === null) {
-    return res.status(400).json({error: "allocated_balance must be a positive number"});
-  }
+  const {id: campaignId, bid: benId} = req.params;
+  const {allocated_balance: newAllocated} = req.body;
 
   const client = await pool.connect();
   try {

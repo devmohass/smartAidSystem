@@ -19,6 +19,12 @@ import {
   createCampaignSchema,
   changeStatusSchema,
 } from "../validators/campaigns.validators.js";
+import {
+  campaignIdParamSchema,
+  campaignIdAndBidParamSchema,
+  enrollSchema,
+  updateAllocationSchema,
+} from "../validators/enrollments.validators.js";
 
 const router = Router();
 
@@ -54,11 +60,26 @@ router.put(
   changeCampaignStatus
 );
 
-// Enrollment endpoints (admin only per brief §8). Validators added in
-// the enrollments slice — left bare here so this commit stays scoped
-// to campaign-resource validation only.
-router.post("/:id/beneficiaries", requireRole("admin"), enrollBeneficiary);
-router.get("/:id/beneficiaries", requireRole("admin"), listEnrollments);
-router.put("/:id/beneficiaries/:bid", requireRole("admin"), updateAllocation);
+// Enrollment endpoints (admin only per brief §8).
+router.post(
+  "/:id/beneficiaries",
+  requireRole("admin"),
+  validate("params", campaignIdParamSchema),
+  validate("body", enrollSchema),
+  enrollBeneficiary
+);
+router.get(
+  "/:id/beneficiaries",
+  requireRole("admin"),
+  validate("params", campaignIdParamSchema),
+  listEnrollments
+);
+router.put(
+  "/:id/beneficiaries/:bid",
+  requireRole("admin"),
+  validate("params", campaignIdAndBidParamSchema),
+  validate("body", updateAllocationSchema),
+  updateAllocation
+);
 
 export default router;
