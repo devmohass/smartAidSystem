@@ -1,14 +1,9 @@
 import bcrypt from "bcrypt";
 import pool from "../db.js";
 
-const ALLOWED_ROLES = ["admin", "shop_manager", "donor"];
 const BCRYPT_ROUNDS = 10;
 
-function isValidEmail(email) {
-  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-export async function listUsers(req, res) {
+export async function listUsers(_req, res) {
   try {
     const {rows} = await pool.query(
       "SELECT id, name, email, role, created_at FROM users ORDER BY id ASC"
@@ -21,10 +16,7 @@ export async function listUsers(req, res) {
 }
 
 export async function getUser(req, res) {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).json({error: "Invalid user id"});
-  }
+  const {id} = req.params;
 
   try {
     const {rows} = await pool.query(
@@ -40,20 +32,7 @@ export async function getUser(req, res) {
 }
 
 export async function createUser(req, res) {
-  const {name, email, password, role} = req.body || {};
-
-  if (!name || !email || !password || !role) {
-    return res.status(400).json({error: "name, email, password and role are required"});
-  }
-  if (!isValidEmail(email)) {
-    return res.status(400).json({error: "Invalid email format"});
-  }
-  if (!ALLOWED_ROLES.includes(role)) {
-    return res.status(400).json({error: `role must be one of: ${ALLOWED_ROLES.join(", ")}`});
-  }
-  if (typeof password !== "string" || password.length < 6) {
-    return res.status(400).json({error: "password must be at least 6 characters"});
-  }
+  const {name, email, password, role} = req.body;
 
   const client = await pool.connect();
   try {
@@ -91,22 +70,8 @@ export async function createUser(req, res) {
 }
 
 export async function updateUser(req, res) {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).json({error: "Invalid user id"});
-  }
-
-  const {name, email} = req.body || {};
-
-  if (name === undefined && email === undefined) {
-    return res.status(400).json({error: "Provide at least one field to update (name, email)"});
-  }
-  if (email !== undefined && !isValidEmail(email)) {
-    return res.status(400).json({error: "Invalid email format"});
-  }
-  if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
-    return res.status(400).json({error: "name must be a non-empty string"});
-  }
+  const {id} = req.params;
+  const {name, email} = req.body;
 
   const fields = [];
   const values = [];
@@ -139,10 +104,7 @@ export async function updateUser(req, res) {
 }
 
 export async function deleteUser(req, res) {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).json({error: "Invalid user id"});
-  }
+  const {id} = req.params;
 
   if (req.user && req.user.id === id) {
     return res.status(400).json({error: "You cannot delete your own account"});
