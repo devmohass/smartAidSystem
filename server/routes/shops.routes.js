@@ -4,6 +4,7 @@ import {
   getShop,
   createShop,
   updateShop,
+  deleteShop,
   listShopManagers,
   assignShopManager,
   unassignShopManager,
@@ -15,6 +16,7 @@ import validate from "../middleware/validate.js";
 import {
   idParamSchema,
   idAndUserIdParamSchema,
+  listQuerySchema,
   createShopSchema,
   updateShopSchema,
   assignShopManagerSchema,
@@ -24,7 +26,7 @@ const router = Router();
 
 router.use(verifyToken, requireRole("admin"));
 
-router.get("/", listShops);
+router.get("/", validate("query", listQuerySchema), listShops);
 router.post("/", validate("body", createShopSchema), createShop);
 router.get("/:id", validate("params", idParamSchema), getShop);
 router.put(
@@ -33,6 +35,7 @@ router.put(
   validate("body", updateShopSchema),
   updateShop
 );
+router.delete("/:id", validate("params", idParamSchema), deleteShop);
 
 router.get("/:id/report", validate("params", idParamSchema), getShopReport);
 

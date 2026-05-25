@@ -23,7 +23,10 @@ export async function enrollBeneficiary(req, res) {
       return res.status(409).json({error: "Cannot enroll into a closed campaign"});
     }
 
-    const benCheck = await client.query("SELECT id FROM beneficiaries WHERE id = $1", [benId]);
+    const benCheck = await client.query(
+      "SELECT id FROM beneficiaries WHERE id = $1 AND deleted_at IS NULL",
+      [benId]
+    );
     if (benCheck.rowCount === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({error: "Beneficiary not found"});

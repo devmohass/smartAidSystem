@@ -1,17 +1,43 @@
 import pool from "../db.js";
 import {ok} from "../utils/respond.js";
 
-export async function listShops(_req, res) {
+export async function listShops(req, res) {
+  const {q = null, limit, offset} = req.query;
+  const search = q ? `%${q}%` : null;
+
+  const where = `
+    WHERE s.deleted_at IS NULL
+      AND ($1::text IS NULL OR s.name ILIKE $1 OR s.owner_name ILIKE $1 OR s.location ILIKE $1)`;
+
   const {rows} = await pool.query(
-    "SELECT id, name, location, owner_name, created_by, created_at FROM shops ORDER BY id ASC"
+    `SELECT s.id, s.name, s.location, s.owner_name, s.created_by, s.created_at,
+            COALESCE(tx.cnt, 0)::int     AS tx_count,
+            COALESCE(tx.total, 0)::float AS total_disbursed
+     FROM shops s
+     LEFT JOIN (
+       SELECT shop_id, COUNT(*) AS cnt, SUM(amount) AS total
+       FROM transactions GROUP BY shop_id
+     ) tx ON tx.shop_id = s.id
+     ${where}
+     ORDER BY s.id ASC LIMIT $2 OFFSET $3`,
+    [search, limit, offset]
   );
-  return ok(res, rows);
+  const {rows: countRows} = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM shops s ${where}`,
+    [search]
+  );
+
+  return res.status(200).json({
+    data: rows,
+    pagination: {limit, offset, total: countRows[0].total},
+    filters: {q},
+  });
 }
 
 export async function getShop(req, res) {
   const {id} = req.params;
   const {rows} = await pool.query(
-    "SELECT id, name, location, owner_name, created_by, created_at FROM shops WHERE id = $1",
+    "SELECT id, name, location, owner_name, created_by, created_at FROM shops WHERE id = $1 AND deleted_at IS NULL",
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Shop not found"});
@@ -51,7 +77,7 @@ export async function updateShop(req, res) {
   values.push(id);
 
   const {rows} = await pool.query(
-    `UPDATE shops SET ${fields.join(", ")} WHERE id = $${i}
+    `UPDATE shops SET ${fields.join(", ")} WHERE id = $${i} AND deleted_at IS NULL
      RETURNING id, name, location, owner_name, created_by, created_at`,
     values
   );
@@ -59,10 +85,24 @@ export async function updateShop(req, res) {
   return ok(res, rows[0]);
 }
 
+export async function deleteShop(req, res) {
+  const {id} = req.params;
+  // Soft delete: retain the shop (and its transaction history) for audit.
+  const result = await pool.query(
+    "UPDATE shops SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+    [id]
+  );
+  if (result.rowCount === 0) return res.status(404).json({error: "Shop not found"});
+  return res.status(204).send();
+}
+
 export async function listShopManagers(req, res) {
   const {id} = req.params;
 
-  const shopExists = await pool.query("SELECT 1 FROM shops WHERE id = $1", [id]);
+  const shopExists = await pool.query(
+    "SELECT 1 FROM shops WHERE id = $1 AND deleted_at IS NULL",
+    [id]
+  );
   if (shopExists.rowCount === 0) {
     return res.status(404).json({error: "Shop not found"});
   }
@@ -84,10 +124,16 @@ export async function assignShopManager(req, res) {
 
   const client = await pool.connect();
   try {
-    const shop = await client.query("SELECT id FROM shops WHERE id = $1", [shopId]);
+    const shop = await client.query(
+      "SELECT id FROM shops WHERE id = $1 AND deleted_at IS NULL",
+      [shopId]
+    );
     if (shop.rowCount === 0) return res.status(404).json({error: "Shop not found"});
 
-    const user = await client.query("SELECT id, role FROM users WHERE id = $1", [userId]);
+    const user = await client.query(
+      "SELECT id, role FROM users WHERE id = $1 AND deleted_at IS NULL",
+      [userId]
+    );
     if (user.rowCount === 0) return res.status(404).json({error: "User not found"});
     if (user.rows[0].role !== "shop_manager") {
       return res.status(400).json({error: "Target user must have role 'shop_manager'"});
@@ -119,7 +165,7 @@ export async function getShopReport(req, res) {
   const {id} = req.params;
 
   const {rows: shopRows} = await pool.query(
-    "SELECT id, name, location, owner_name, created_at FROM shops WHERE id = $1",
+    "SELECT id, name, location, owner_name, created_at FROM shops WHERE id = $1 AND deleted_at IS NULL",
     [id]
   );
   const shop = shopRows[0];

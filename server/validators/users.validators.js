@@ -22,11 +22,14 @@ export const createUserSchema = Joi.object({
     "string.empty": "email is required",
     "string.email": "Invalid email format",
   }),
-  password: Joi.string().min(6).required().messages({
-    "any.required": "password is required",
-    "string.empty": "password is required",
-    "string.min": "password must be at least 6 characters",
-  }),
+  password: Joi.string()
+    .pattern(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)
+    .required()
+    .messages({
+      "any.required": "password is required",
+      "string.empty": "password is required",
+      "string.pattern.base": "password must be at least 8 characters and include a letter and a number",
+    }),
   role: Joi.string()
     .valid(...ALLOWED_ROLES)
     .required()

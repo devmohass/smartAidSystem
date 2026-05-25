@@ -35,14 +35,18 @@ function extractEntityId(path, body) {
   const urlMatch = path.match(/\/(\d+)(?:\/|$)/);
   if (urlMatch) return Number(urlMatch[1]);
 
-  if (body && typeof body === "object") {
+  // Success responses use the { data: <thing> } envelope, so the created
+  // row's id lives at body.data.id — unwrap before probing.
+  const payload = body && typeof body === "object" && "data" in body ? body.data : body;
+
+  if (payload && typeof payload === "object") {
     for (const key of BODY_ID_KEYS) {
-      const value = body[key];
+      const value = payload[key];
       if (value && typeof value === "object" && Number.isInteger(value.id)) {
         return value.id;
       }
     }
-    if (Number.isInteger(body.id)) return body.id;
+    if (Number.isInteger(payload.id)) return payload.id;
   }
   return null;
 }

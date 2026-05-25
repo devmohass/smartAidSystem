@@ -3,8 +3,11 @@ services:
     build: ./server
     container_name: smartAid_server
     restart: always
+    # Dev/demo: bound to localhost (the Vite proxy and host tools use
+    # localhost:3000). For a public deployment, front it with a reverse proxy
+    # (TLS) and set CORS_ORIGIN / CLIENT_DIST in the server env.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./server:/app
       - /app/node_modules
@@ -22,8 +25,10 @@ services:
       POSTGRES_DB: smartAid_db
       POSTGRES_USER: smartAid_user
       POSTGRES_PASSWORD: smartAid_123
+    # Bind to localhost only — the DB must never be reachable from outside the
+    # host. The server container reaches it over the compose network as "db".
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -37,11 +42,13 @@ services:
     container_name: smartAid_pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@smartaid.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@smartaid.com}
+      # Override in a root .env or shell: PGADMIN_PASSWORD=...
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
+    # Localhost only — pgAdmin is an admin tool, never expose it publicly.
     ports:
-      - "5051:80"
+      - "127.0.0.1:5051:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:

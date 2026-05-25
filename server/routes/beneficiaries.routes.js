@@ -5,6 +5,7 @@ import {
   getBeneficiary,
   createBeneficiary,
   updateBeneficiary,
+  deleteBeneficiary,
 } from "../controllers/beneficiaries.controller.js";
 import verifyToken from "../middleware/verifyToken.js";
 import requireRole from "../middleware/requireRole.js";
@@ -12,6 +13,7 @@ import validate from "../middleware/validate.js";
 import {
   idParamSchema,
   searchQuerySchema,
+  listQuerySchema,
   createBeneficiarySchema,
   updateBeneficiarySchema,
 } from "../validators/beneficiaries.validators.js";
@@ -30,7 +32,7 @@ router.get(
 );
 
 // Everything else is admin-only.
-router.get("/", requireRole("admin"), listBeneficiaries);
+router.get("/", requireRole("admin"), validate("query", listQuerySchema), listBeneficiaries);
 router.post(
   "/",
   requireRole("admin"),
@@ -49,6 +51,12 @@ router.put(
   validate("params", idParamSchema),
   validate("body", updateBeneficiarySchema),
   updateBeneficiary
+);
+router.delete(
+  "/:id",
+  requireRole("admin"),
+  validate("params", idParamSchema),
+  deleteBeneficiary
 );
 
 export default router;

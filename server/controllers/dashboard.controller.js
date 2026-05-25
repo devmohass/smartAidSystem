@@ -4,9 +4,9 @@ import {ok} from "../utils/respond.js";
 export async function getDashboard(_req, res) {
   const {rows} = await pool.query(`
     SELECT
-      (SELECT COUNT(*)::int FROM users)                                                AS user_count,
-      (SELECT COUNT(*)::int FROM shops)                                                AS shop_count,
-      (SELECT COUNT(*)::int FROM beneficiaries)                                        AS beneficiary_count,
+      (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL)                       AS user_count,
+      (SELECT COUNT(*)::int FROM shops WHERE deleted_at IS NULL)                       AS shop_count,
+      (SELECT COUNT(*)::int FROM beneficiaries WHERE deleted_at IS NULL)               AS beneficiary_count,
       (SELECT COUNT(*)::int FROM campaigns)                                            AS campaign_total,
       (SELECT COUNT(*)::int FROM campaigns WHERE status = 'draft')                     AS campaign_draft,
       (SELECT COUNT(*)::int FROM campaigns WHERE status = 'active')                    AS campaign_active,
@@ -22,8 +22,25 @@ export async function getDashboard(_req, res) {
          WHERE type = 'campaign_refund')                                               AS ngo_total_refunded
   `);
 
+  // Last 6 calendar months of redeemed value, always 6 contiguous buckets
+  // (generate_series fills months with no transactions as 0).
+  const {rows: utilRows} = await pool.query(`
+    SELECT to_char(m, 'Mon')                AS label,
+           COALESCE(SUM(t.amount), 0)::float AS total
+    FROM generate_series(
+           date_trunc('month', NOW()) - INTERVAL '5 months',
+           date_trunc('month', NOW()),
+           INTERVAL '1 month'
+         ) AS m
+    LEFT JOIN transactions t
+      ON date_trunc('month', t.transaction_at) = m
+    GROUP BY m
+    ORDER BY m
+  `);
+
   const r = rows[0];
   return ok(res, {
+    utilization: utilRows,
     totals: {
       users: r.user_count,
       shops: r.shop_count,

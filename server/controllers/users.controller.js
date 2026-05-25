@@ -6,7 +6,7 @@ const BCRYPT_ROUNDS = 10;
 
 export async function listUsers(_req, res) {
   const {rows} = await pool.query(
-    "SELECT id, name, email, role, created_at FROM users ORDER BY id ASC"
+    "SELECT id, name, email, role, created_at FROM users WHERE deleted_at IS NULL ORDER BY id ASC"
   );
   return ok(res, rows);
 }
@@ -14,7 +14,7 @@ export async function listUsers(_req, res) {
 export async function getUser(req, res) {
   const {id} = req.params;
   const {rows} = await pool.query(
-    "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
+    "SELECT id, name, email, role, created_at FROM users WHERE id = $1 AND deleted_at IS NULL",
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "User not found"});
@@ -77,7 +77,7 @@ export async function updateUser(req, res) {
 
   try {
     const {rows} = await pool.query(
-      `UPDATE users SET ${fields.join(", ")} WHERE id = $${i}
+      `UPDATE users SET ${fields.join(", ")} WHERE id = $${i} AND deleted_at IS NULL
        RETURNING id, name, email, role, created_at`,
       values
     );
@@ -98,18 +98,13 @@ export async function deleteUser(req, res) {
     return res.status(400).json({error: "You cannot delete your own account"});
   }
 
-  try {
-    const result = await pool.query("DELETE FROM users WHERE id = $1", [id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({error: "User not found"});
-    }
-    return res.status(204).send();
-  } catch (err) {
-    if (err.code === "23503") {
-      return res.status(409).json({
-        error: "Cannot delete user: they have related records (transactions, campaigns, etc.)",
-      });
-    }
-    throw err;
+  // Soft delete: retain the user (and everything they authored) for audit.
+  const result = await pool.query(
+    "UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+    [id]
+  );
+  if (result.rowCount === 0) {
+    return res.status(404).json({error: "User not found"});
   }
+  return res.status(204).send();
 }

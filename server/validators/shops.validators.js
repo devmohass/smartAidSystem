@@ -1,5 +1,11 @@
 import Joi from "joi";
 
+export const listQuerySchema = Joi.object({
+  q: Joi.string().trim().allow("").optional(),
+  limit: Joi.number().integer().min(1).max(500).default(50),
+  offset: Joi.number().integer().min(0).default(0),
+});
+
 export const idParamSchema = Joi.object({
   id: Joi.number().integer().positive().required().messages({
     "any.required": "Invalid shop id",

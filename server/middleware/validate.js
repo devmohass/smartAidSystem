@@ -29,7 +29,15 @@ export default function validate(source, schema) {
       });
     }
 
-    req[source] = value;
+    // Express 5 exposes req.query as a getter-only property, so a plain
+    // `req.query = value` throws. defineProperty shadows it with the validated
+    // value and works uniformly for body/params/query.
+    Object.defineProperty(req, source, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
     return next();
   };
 }

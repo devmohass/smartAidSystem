@@ -1,5 +1,17 @@
 import Joi from "joi";
 
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
+
+export const listQuerySchema = Joi.object({
+  campaign_id: Joi.number().integer().positive().optional(),
+  shop_id: Joi.number().integer().positive().optional(),
+  status: Joi.string().valid("completed", "failed").optional(),
+  q: Joi.string().trim().allow("").optional(),
+  limit: Joi.number().integer().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
+  offset: Joi.number().integer().min(0).default(0),
+});
+
 export const idParamSchema = Joi.object({
   id: Joi.number().integer().positive().required().messages({
     "any.required": "Invalid transaction id",

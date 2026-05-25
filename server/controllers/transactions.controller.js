@@ -37,6 +37,25 @@ export async function processTransaction(req, res) {
       });
     }
 
+    // A soft-deleted beneficiary or shop must not accept new redemptions, even
+    // if an old enrollment/manager link still exists.
+    const benActive = await client.query(
+      "SELECT 1 FROM beneficiaries WHERE id = $1 AND deleted_at IS NULL",
+      [benId]
+    );
+    if (benActive.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({error: "Beneficiary not found"});
+    }
+    const shopActive = await client.query(
+      "SELECT 1 FROM shops WHERE id = $1 AND deleted_at IS NULL",
+      [shopId]
+    );
+    if (shopActive.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({error: "Shop not found"});
+    }
+
     const {rows: enrollRows} = await client.query(
       `SELECT id, remaining_balance FROM campaign_beneficiaries
        WHERE campaign_id = $1 AND beneficiary_id = $2 FOR UPDATE`,
@@ -113,31 +132,68 @@ export async function processTransaction(req, res) {
   }
 }
 
-export async function listTransactions(_req, res) {
+// The name joins deliberately omit the `deleted_at IS NULL` filter: a
+// transaction is an immutable audit record, so it must keep showing the
+// beneficiary/shop name even after that beneficiary or shop is soft-deleted.
+const TXN_SELECT = `
+  t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
+  t.amount, t.goods_description, t.balance_before, t.balance_after,
+  t.status, t.transaction_at,
+  r.receipt_code, r.issued_at AS receipt_issued_at,
+  b.name  AS beneficiary_name,
+  s.name  AS shop_name,
+  c.title AS campaign_title
+  FROM transactions t
+  LEFT JOIN receipts r      ON r.transaction_id = t.id
+  LEFT JOIN beneficiaries b ON b.id = t.beneficiary_id
+  LEFT JOIN shops s         ON s.id = t.shop_id
+  LEFT JOIN campaigns c     ON c.id = t.campaign_id`;
+
+export async function listTransactions(req, res) {
+  const {
+    campaign_id: campaignId = null,
+    shop_id: shopId = null,
+    status = null,
+    q = null,
+    limit,
+    offset,
+  } = req.query;
+  const search = q ? `%${q}%` : null;
+
+  // Same predicate for the page and the count. b/r are joined so search can hit
+  // beneficiary name and receipt code.
+  const where = `
+    WHERE ($1::int  IS NULL OR t.campaign_id = $1)
+      AND ($2::int  IS NULL OR t.shop_id = $2)
+      AND ($3::text IS NULL OR t.status = $3)
+      AND ($4::text IS NULL OR b.name ILIKE $4 OR r.receipt_code ILIKE $4)`;
+
   const {rows} = await pool.query(
-    `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
-            t.amount, t.goods_description, t.balance_before, t.balance_after,
-            t.status, t.transaction_at,
-            r.receipt_code, r.issued_at AS receipt_issued_at
-     FROM transactions t
-     LEFT JOIN receipts r ON r.transaction_id = t.id
-     ORDER BY t.id DESC`
+    `SELECT ${TXN_SELECT} ${where} ORDER BY t.id DESC LIMIT $5 OFFSET $6`,
+    [campaignId, shopId, status, search, limit, offset]
   );
-  return ok(res, rows);
+  // total + filtered sum so the screen's stat cards reflect the whole result
+  // set, not just the current page.
+  const {rows: aggRows} = await pool.query(
+    `SELECT COUNT(*)::int AS total, COALESCE(SUM(t.amount), 0)::float AS total_amount
+     FROM transactions t
+     LEFT JOIN receipts r      ON r.transaction_id = t.id
+     LEFT JOIN beneficiaries b ON b.id = t.beneficiary_id
+     ${where}`,
+    [campaignId, shopId, status, search]
+  );
+
+  return res.status(200).json({
+    data: rows,
+    pagination: {limit, offset, total: aggRows[0].total},
+    summary: {total_amount: aggRows[0].total_amount},
+    filters: {campaign_id: campaignId, shop_id: shopId, status, q},
+  });
 }
 
 export async function getTransaction(req, res) {
   const {id} = req.params;
-  const {rows} = await pool.query(
-    `SELECT t.id, t.campaign_id, t.beneficiary_id, t.shop_id, t.shop_manager_id,
-            t.amount, t.goods_description, t.balance_before, t.balance_after,
-            t.status, t.transaction_at,
-            r.receipt_code, r.issued_at AS receipt_issued_at
-     FROM transactions t
-     LEFT JOIN receipts r ON r.transaction_id = t.id
-     WHERE t.id = $1`,
-    [id]
-  );
+  const {rows} = await pool.query(`SELECT ${TXN_SELECT} WHERE t.id = $1`, [id]);
   if (!rows[0]) return res.status(404).json({error: "Transaction not found"});
   return ok(res, rows[0]);
 }

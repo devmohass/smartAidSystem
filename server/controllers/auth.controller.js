@@ -9,7 +9,7 @@ export async function login(req, res) {
   const {email, password} = req.body;
 
   const {rows} = await pool.query(
-    "SELECT id, name, email, role, password_hash FROM users WHERE email = $1",
+    "SELECT id, name, email, role, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL",
     [email]
   );
   const user = rows[0];
@@ -37,7 +37,7 @@ export async function login(req, res) {
 
 export async function me(req, res) {
   const {rows} = await pool.query(
-    "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
+    "SELECT id, name, email, role, created_at FROM users WHERE id = $1 AND deleted_at IS NULL",
     [req.user.id]
   );
   const user = rows[0];

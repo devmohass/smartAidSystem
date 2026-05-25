@@ -5,11 +5,28 @@ import {ok} from "../utils/respond.js";
 const SELECT_FIELDS = `id, name, phone_number, qr_code, profile_image_url,
                        family_size, location, created_by, created_at`;
 
-export async function listBeneficiaries(_req, res) {
+export async function listBeneficiaries(req, res) {
+  const {q = null, limit, offset} = req.query;
+  const search = q ? `%${q}%` : null;
+
+  const where = `
+    WHERE deleted_at IS NULL
+      AND ($1::text IS NULL OR name ILIKE $1 OR phone_number ILIKE $1 OR location ILIKE $1)`;
+
   const {rows} = await pool.query(
-    `SELECT ${SELECT_FIELDS} FROM beneficiaries ORDER BY id ASC`
+    `SELECT ${SELECT_FIELDS} FROM beneficiaries ${where} ORDER BY id ASC LIMIT $2 OFFSET $3`,
+    [search, limit, offset]
   );
-  return ok(res, rows);
+  const {rows: countRows} = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM beneficiaries ${where}`,
+    [search]
+  );
+
+  return res.status(200).json({
+    data: rows,
+    pagination: {limit, offset, total: countRows[0].total},
+    filters: {q},
+  });
 }
 
 export async function searchBeneficiary(req, res) {
@@ -17,11 +34,11 @@ export async function searchBeneficiary(req, res) {
 
   const {rows} = phone
     ? await pool.query(
-        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE phone_number = $1`,
+        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE phone_number = $1 AND deleted_at IS NULL`,
         [phone]
       )
     : await pool.query(
-        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE qr_code = $1`,
+        `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE qr_code = $1 AND deleted_at IS NULL`,
         [qrCode]
       );
 
@@ -32,7 +49,7 @@ export async function searchBeneficiary(req, res) {
 export async function getBeneficiary(req, res) {
   const {id} = req.params;
   const {rows} = await pool.query(
-    `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE id = $1`,
+    `SELECT ${SELECT_FIELDS} FROM beneficiaries WHERE id = $1 AND deleted_at IS NULL`,
     [id]
   );
   if (!rows[0]) return res.status(404).json({error: "Beneficiary not found"});
@@ -69,6 +86,18 @@ export async function createBeneficiary(req, res) {
   }
 }
 
+export async function deleteBeneficiary(req, res) {
+  const {id} = req.params;
+  // Soft delete: keep the row (and its transaction history) for audit, just
+  // flag it. Already-deleted or missing ids return 404.
+  const result = await pool.query(
+    "UPDATE beneficiaries SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+    [id]
+  );
+  if (result.rowCount === 0) return res.status(404).json({error: "Beneficiary not found"});
+  return res.status(204).send();
+}
+
 export async function updateBeneficiary(req, res) {
   const {id} = req.params;
   const {name, phone_number, profile_image_url, family_size, location} = req.body;
@@ -100,7 +129,7 @@ export async function updateBeneficiary(req, res) {
 
   try {
     const {rows} = await pool.query(
-      `UPDATE beneficiaries SET ${fields.join(", ")} WHERE id = $${i}
+      `UPDATE beneficiaries SET ${fields.join(", ")} WHERE id = $${i} AND deleted_at IS NULL
        RETURNING ${SELECT_FIELDS}`,
       values
     );
